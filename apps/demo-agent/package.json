@@ -1,0 +1,27 @@
+{
+  "name": "@peribolos/demo-agent",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Peribolos demo agent — proves the injection block live: a scripted (no-LLM, rehearsal-safe) run and a real LLM agent run, both against a live vault on Arc testnet.",
+  "type": "module",
+  "scripts": {
+    "demo": "tsx --env-file=.env src/scripted-demo.ts",
+    "demo:llm": "tsx --env-file=.env src/agent-demo.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@langchain/core": "^1.2.3",
+    "@langchain/openai": "^1.5.5",
+    "@peribolos/core": "*",
+    "@peribolos/langchain": "*",
+    "viem": "^2.21.54"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

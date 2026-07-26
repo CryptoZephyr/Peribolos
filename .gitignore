@@ -1,0 +1,52 @@
+# Secrets — never commit real env files
+.env
+.env.*
+*.key
+keystores/
+*.pw
+
+# Keep example env templates trackable
+!.env.example
+!**/.env.example
+
+# Foundry
+contracts/out/
+contracts/cache/
+contracts/broadcast/
+
+# Node / Next
+node_modules/
+.next/
+dist/
+*.tsbuildinfo
+
+# Local Database & Dynamic State
+data/
+apps/api/data/
+*.json.bak
+*.db
+*.sqlite
+
+# Testing & Dogfooding Logs/Output
+*.log
+dogfood-output/
+dogfood-user-feedback.log
+
+# IDE, OS, & AI Agent Configs
+.claude/
+.agents/
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Documentation Directory
+docs/
+
+# Personal Planning & Archive Folders
+archive/
+
+# Ignore all Markdown files except README.md files
+*.md
+!README.md
+!**/README.md

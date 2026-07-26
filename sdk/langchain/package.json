@@ -1,0 +1,37 @@
+{
+  "name": "@peribolos/langchain",
+  "version": "0.1.0",
+  "description": "LangChain tools that give an agent a rule-enforced Peribolos vault on Arc.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@peribolos/core": "*",
+    "zod": "^3.23.0"
+  },
+  "peerDependencies": {
+    "@langchain/core": ">=1.2.3"
+  },
+  "devDependencies": {
+    "@langchain/core": "^1.2.3",
+    "tsup": "^8.5.1",
+    "typescript": "^5.6.0"
+  }
+}

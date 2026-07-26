@@ -1,0 +1,39 @@
+{
+  "name": "@peribolos/core",
+  "version": "0.1.0",
+  "description": "TypeScript client for Peribolos vaults on Arc — rule-enforced USDC spending for AI agents.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./abi/*": "./src/abi/*"
+  },
+  "files": [
+    "dist",
+    "src/abi"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "tsx --test test/unit.test.ts",
+    "test:live": "node test/live.mjs"
+  },
+  "dependencies": {
+    "@circle-fin/x402-batching": "^3.2.0",
+    "viem": "^2.21.54"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "tsup": "^8.5.1",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}

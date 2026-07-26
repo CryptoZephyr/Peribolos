@@ -1,0 +1,40 @@
+{
+  "name": "peribolos",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Rule-enforced USDC spending vaults for AI agents on Arc.",
+  "workspaces": [
+    "sdk/core",
+    "sdk/langchain",
+    "apps/demo-seller",
+    "apps/demo-agent",
+    "apps/dashboard",
+    "apps/api"
+  ],
+  "scripts": {
+    "build": "npm run build -w @peribolos/core && npm run build -w @peribolos/langchain && npm run build -w @peribolos/dashboard",
+    "build:sdk": "npm run build -w @peribolos/core && npm run build -w @peribolos/langchain",
+    "preflight": "npm run build:sdk && node scripts/preflight.mjs",
+    "dev:dashboard": "npm run dev -w @peribolos/dashboard",
+    "dev:seller": "npm run dev -w @peribolos/demo-seller",
+    "dev:stack": "node scripts/dev-stack.mjs",
+    "start:stack": "node scripts/start-stack.mjs",
+    "demo": "npm run demo -w @peribolos/demo-agent",
+    "demo:full": "npm run build:sdk && node scripts/demo-full.mjs",
+    "demo:llm": "npm run demo:llm -w @peribolos/demo-agent",
+    "judge": "npm run preflight && npm run demo:full",
+    "test": "npm run test -w @peribolos/core && npm run test -w @peribolos/api",
+    "test:api": "npm run test -w @peribolos/api",
+    "dev:api": "npm run dev -w @peribolos/api",
+    "typecheck": "npm run typecheck -w @peribolos/core && npm run typecheck -w @peribolos/langchain && npm run typecheck -w @peribolos/dashboard && npm run typecheck -w @peribolos/demo-agent && npm run typecheck -w @peribolos/demo-seller && npm run typecheck -w @peribolos/api"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "overrides": {
+    "axios": "^1.18.0",
+    "postcss": "^8.5.10",
+    "sharp": "^0.35.0",
+    "ws": "^8.21.0"
+  }
+}

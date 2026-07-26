@@ -1,0 +1,65 @@
+@import "tailwindcss";
+
+/*
+  Peribolos theme — ONE theme, locked dark (Page Theme Lock).
+  Base: zinc-950 family. Single accent: emerald. Semantic red is reserved
+  exclusively for blocked-payment state (product semantics, not decoration).
+  Shape system: soft (12px radius) everywhere; pills only for status chips.
+*/
+@theme {
+  --color-surface: #0b0b0d; /* off-black, never pure #000 */
+  --color-surface-raised: #131316;
+  --color-surface-overlay: #1b1b1f;
+  --color-line: #26262b;
+  --color-line-strong: #34343a;
+  --color-text: #f2f2f3; /* off-white, never pure #fff */
+  --color-text-muted: #a1a1aa;
+  --color-text-faint: #6b6b74;
+  --color-accent: #34d399; /* emerald-400: the single accent */
+  --color-accent-deep: #059669;
+  --color-accent-tint: rgba(52, 211, 153, 0.08);
+  --color-blocked: #f87171; /* semantic only: blocked payments */
+  --color-blocked-tint: rgba(248, 113, 113, 0.08);
+
+  --radius-card: 12px;
+
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, "SFMono-Regular", monospace;
+}
+
+html {
+  color-scheme: dark;
+  scroll-behavior: smooth;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+body {
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+::selection {
+  background: var(--color-accent-deep);
+  color: var(--color-text);
+}
+
+/* Focus visibility: accessibility is part of the security posture. */
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
