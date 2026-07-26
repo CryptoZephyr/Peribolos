@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import { ArrowSquareOut, Prohibit, ShieldCheck } from "@phosphor-icons/react";
 import { formatUsdc, shortAddress, txUrl } from "@/lib/chain";
 import { REASON_EXPLANATION, REASON_LABEL } from "@/lib/reasons";
@@ -10,7 +11,7 @@ function formatTimestamp(timestamp: bigint | undefined, blockNumber: bigint): st
   return new Date(Number(timestamp) * 1000).toLocaleString();
 }
 
-export function ActivityRow({ event }: { event: ActivityRowData }) {
+export const ActivityRow = memo(function ActivityRow({ event }: { event: ActivityRowData }) {
   const blocked = event.kind === "blocked";
 
   return (
@@ -61,7 +62,7 @@ export function ActivityRow({ event }: { event: ActivityRowData }) {
       </div>
     </div>
   );
-}
+});
 
 export function ActivityRowSkeleton() {
   return (

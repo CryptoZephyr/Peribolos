@@ -12,7 +12,7 @@ export function Skeleton({ className = "" }: { className?: string }) {
 
 export function SkeletonCard() {
   return (
-    <div className="rounded-xl border border-line bg-surface-raised p-5 space-y-3">
+    <div className="rounded-xl border border-line bg-surface-raised p-5 space-y-3 min-h-[106px]">
       <Skeleton className="h-4 w-24" />
       <Skeleton className="h-8 w-32" />
       <Skeleton className="h-3 w-40" />

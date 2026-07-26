@@ -1,8 +1,8 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { memo, useState } from "react";
 
-export function ExplorerBadge({
+export const ExplorerBadge = memo(function ExplorerBadge({
   type,
   hashOrAddress,
   label,
@@ -29,7 +29,7 @@ export function ExplorerBadge({
       <span className="text-[9px]">↗</span>
     </a>
   );
-}
+});
 
 export function CopyButton({ text, label = "Copy" }: { text: string; label?: string }) {
   const [copied, setCopied] = useState(false);

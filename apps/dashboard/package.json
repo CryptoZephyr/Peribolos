@@ -4,8 +4,8 @@
   "private": true,
   "description": "Peribolos landing + vault dashboard. Static Next.js export, no backend: the chain is the database.",
   "scripts": {
-    "dev": "next dev --turbo -p 3000",
-    "start": "npx serve -s out -p 3000",
+    "dev": "next dev -p 3000",
+    "start": "serve -s out -p 3000",
     "build": "next build",
     "typecheck": "tsc --noEmit"
   },

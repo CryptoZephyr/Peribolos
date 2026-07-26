@@ -11,7 +11,10 @@
  */
 
 import { useEffect, useRef } from "react";
-import * as THREE from "three";
+import * as THREE_MODULE from "three";
+
+// Cast THREE to any to avoid resolution mismatches with @types/three in Next.js bundler mode
+const THREE = THREE_MODULE as any;
 
 const ACCENT = 0x34d399;
 const RADIUS = 3;
@@ -71,7 +74,7 @@ export function HeroCanvas() {
     const P = 64;
     const pgeo = new THREE.BufferGeometry();
     const pos = new Float32Array(P * 3);
-    const vel: THREE.Vector3[] = [];
+    const vel: any[] = [];
     for (let i = 0; i < P; i++) {
       const r = Math.random() * RADIUS * 0.68;
       const a = Math.random() * Math.PI * 2;

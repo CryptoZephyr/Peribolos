@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { fetchApi, API_BASE_URL } from "@/lib/api-client";
 import { useToast } from "@/app/components/Toast";
 import { SkeletonTableRows } from "@/app/components/Skeleton";
@@ -24,11 +24,23 @@ export default function ActivityPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  const filteredRequests = paymentRequests.filter((pr) => {
-    if (filter === "EXECUTED") return pr.status === "EXECUTED";
-    if (filter === "BLOCKED") return pr.status === "BLOCKED";
-    return true;
-  });
+  const { filteredRequests, executedCount, blockedCount } = useMemo(() => {
+    let executed = 0;
+    let blocked = 0;
+    const filtered: any[] = [];
+
+    for (let i = 0; i < paymentRequests.length; i++) {
+      const pr = paymentRequests[i];
+      if (pr.status === "EXECUTED") executed++;
+      else if (pr.status === "BLOCKED") blocked++;
+
+      if (filter === "ALL") filtered.push(pr);
+      else if (filter === "EXECUTED" && pr.status === "EXECUTED") filtered.push(pr);
+      else if (filter === "BLOCKED" && pr.status === "BLOCKED") filtered.push(pr);
+    }
+
+    return { filteredRequests: filtered, executedCount: executed, blockedCount: blocked };
+  }, [paymentRequests, filter]);
 
   return (
     <div className="space-y-8 animate-in fade-in duration-300">
@@ -78,7 +90,7 @@ export default function ActivityPage() {
               : "bg-surface-raised border border-line text-text-muted hover:text-text"
           }`}
         >
-          Executed ({paymentRequests.filter((p) => p.status === "EXECUTED").length})
+          Executed ({executedCount})
         </button>
         <button
           onClick={() => setFilter("BLOCKED")}
@@ -88,7 +100,7 @@ export default function ActivityPage() {
               : "bg-surface-raised border border-line text-text-muted hover:text-text"
           }`}
         >
-          Blocked Attempts ({paymentRequests.filter((p) => p.status === "BLOCKED").length})
+          Blocked Attempts ({blockedCount})
         </button>
       </div>
 

@@ -13,8 +13,23 @@ const nextConfig = {
   typescript: { ignoreBuildErrors: false },
   // Keep webpack from following outside the workspace for @peribolos packages.
   transpilePackages: ["@peribolos/core"],
+  turbopack: {
+    root: path.join(__dirname, "../.."),
+  },
+  experimental: {
+    optimizePackageImports: ["@phosphor-icons/react"],
+  },
   webpack: (config) => {
     config.resolve = config.resolve || {};
+    config.resolve.modules = [
+      ...(config.resolve.modules || []),
+      path.resolve(__dirname, "../../node_modules"),
+    ];
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      "@solana-program/token": false,
+      "@coinbase/cdp-sdk": false,
+    };
     config.resolve.fallback = {
       ...config.resolve.fallback,
       fs: false,

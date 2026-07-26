@@ -1,6 +1,17 @@
+"use client";
+
 import Link from "next/link";
-import { ArrowRight } from "@phosphor-icons/react/dist/ssr";
-import { HeroCanvas } from "./HeroCanvas";
+import dynamic from "next/dynamic";
+import { ArrowRight } from "@phosphor-icons/react";
+
+const HeroCanvas = dynamic(
+  () => import("./HeroCanvas").then((m) => m.HeroCanvas),
+  {
+    ssr: false,
+    loading: () => <div className="absolute inset-0 bg-surface/20" aria-hidden />,
+  }
+);
+
 
 export function Hero() {
   return (

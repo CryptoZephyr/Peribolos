@@ -16,15 +16,15 @@ export default function AppLayout({ children }: { children: ReactNode }) {
                 <span>Peribolos <span className="text-xs font-normal text-text-muted px-1.5 py-0.5 rounded bg-surface-raised border border-line">V2 MVP</span></span>
               </Link>
               <nav className="hidden items-center gap-5 text-xs font-medium text-text-muted md:flex">
-                <Link href="/app" className="transition-colors hover:text-text">Dashboard</Link>
-                <Link href="/app/agents" className="transition-colors hover:text-text">Agents</Link>
-                <Link href="/app/vaults" className="transition-colors hover:text-text">Vaults</Link>
-                <Link href="/app/payees" className="transition-colors hover:text-text">Payees</Link>
-                <Link href="/app/activity" className="transition-colors hover:text-text">Activity & Audit</Link>
-                <Link href="/app/simulations" className="transition-colors hover:text-text">Simulations</Link>
-                <Link href="/app/api-keys" className="transition-colors hover:text-text">API Keys</Link>
-                <Link href="/app/pricing" className="transition-colors hover:text-text">Pricing</Link>
-                <Link href="/app/security" className="transition-colors hover:text-text">Security</Link>
+                <Link href="/app" prefetch={true} className="transition-colors hover:text-text">Dashboard</Link>
+                <Link href="/app/agents" prefetch={true} className="transition-colors hover:text-text">Agents</Link>
+                <Link href="/app/vaults" prefetch={true} className="transition-colors hover:text-text">Vaults</Link>
+                <Link href="/app/payees" prefetch={true} className="transition-colors hover:text-text">Payees</Link>
+                <Link href="/app/activity" prefetch={true} className="transition-colors hover:text-text">Activity & Audit</Link>
+                <Link href="/app/simulations" prefetch={true} className="transition-colors hover:text-text">Simulations</Link>
+                <Link href="/app/api-keys" prefetch={true} className="transition-colors hover:text-text">API Keys</Link>
+                <Link href="/app/pricing" prefetch={true} className="transition-colors hover:text-text">Pricing</Link>
+                <Link href="/app/security" prefetch={true} className="transition-colors hover:text-text">Security</Link>
               </nav>
             </div>
             <div className="flex items-center gap-3">
@@ -40,14 +40,14 @@ export default function AppLayout({ children }: { children: ReactNode }) {
         {/* Subnav for mobile / desktop view */}
         <div className="border-b border-line bg-surface-raised/50 py-2 px-6 overflow-x-auto md:hidden">
           <div className="flex items-center gap-4 text-xs font-medium text-text-muted whitespace-nowrap">
-            <Link href="/app" className="hover:text-text">Dashboard</Link>
-            <Link href="/app/agents" className="hover:text-text">Agents</Link>
-            <Link href="/app/vaults" className="hover:text-text">Vaults</Link>
-            <Link href="/app/payees" className="hover:text-text">Payees</Link>
-            <Link href="/app/activity" className="hover:text-text">Activity</Link>
-            <Link href="/app/simulations" className="hover:text-text">Simulations</Link>
-            <Link href="/app/api-keys" className="hover:text-text">API Keys</Link>
-            <Link href="/app/pricing" className="hover:text-text">Pricing</Link>
+            <Link href="/app" prefetch={true} className="hover:text-text">Dashboard</Link>
+            <Link href="/app/agents" prefetch={true} className="hover:text-text">Agents</Link>
+            <Link href="/app/vaults" prefetch={true} className="hover:text-text">Vaults</Link>
+            <Link href="/app/payees" prefetch={true} className="hover:text-text">Payees</Link>
+            <Link href="/app/activity" prefetch={true} className="hover:text-text">Activity</Link>
+            <Link href="/app/simulations" prefetch={true} className="hover:text-text">Simulations</Link>
+            <Link href="/app/api-keys" prefetch={true} className="hover:text-text">API Keys</Link>
+            <Link href="/app/pricing" prefetch={true} className="hover:text-text">Pricing</Link>
           </div>
         </div>
 
