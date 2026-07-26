@@ -7,8 +7,8 @@ services:
     env: node
     plan: free
     region: oregon
-    buildCommand: npm ci && npm run build:sdk
-    startCommand: npx tsx apps/api/src/server.ts
+    buildCommand: npm ci && npm run build:sdk && npm run build -w @peribolos/api
+    startCommand: node apps/api/dist/server.js
     healthCheckPath: /health
     envVars:
       - key: PORT
@@ -21,7 +21,10 @@ services:
         generateValue: true
       - key: CORS_ORIGIN
         value: "*"
-    disk:
-      name: peribolos-db-data
-      mountPath: /app/apps/api/data
-      sizeGB: 1
+    # Persistent disks require a paid plan on Render (Starter or above).
+    # Uncomment below if deploying on a paid instance:
+    # disk:
+    #   name: peribolos-db-data
+    #   mountPath: /app/apps/api/data
+    #   sizeGB: 1
+
