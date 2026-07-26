@@ -1,0 +1,27 @@
+# Render Blueprint for Peribolos V2 Backend API
+# Docs: https://render.com/docs/blueprint-spec
+
+services:
+  - type: web
+    name: peribolos-api
+    env: node
+    plan: free
+    region: oregon
+    buildCommand: npm ci && npm run build:sdk
+    startCommand: npx tsx apps/api/src/server.ts
+    healthCheckPath: /health
+    envVars:
+      - key: PORT
+        value: 10000
+      - key: NODE_ENV
+        value: production
+      - key: ARC_RPC_URL
+        value: https://rpc.testnet.arc.network
+      - key: SIGNER_ENCRYPTION_KEY
+        generateValue: true
+      - key: CORS_ORIGIN
+        value: "*"
+    disk:
+      name: peribolos-db-data
+      mountPath: /app/apps/api/data
+      sizeGB: 1
