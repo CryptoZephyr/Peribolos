@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { Providers } from "@/app/providers";
 import { ConnectButton } from "@/app/app/components/ConnectButton";
+import { PeribolosLogo } from "@/app/components/PeribolosLogo";
 
 export default function AppLayout({ children }: { children: ReactNode }) {
   return (
@@ -11,9 +12,8 @@ export default function AppLayout({ children }: { children: ReactNode }) {
         <header className="border-b border-line bg-surface/90 backdrop-blur sticky top-0 z-40">
           <div className="mx-auto flex max-w-[1280px] items-center justify-between px-6 py-3.5">
             <div className="flex items-center gap-8">
-              <Link href="/" className="flex items-center gap-2 text-base font-bold tracking-tight text-text">
-                <span className="h-6 w-6 rounded-md bg-accent flex items-center justify-center text-white text-xs font-mono">P</span>
-                <span>Peribolos <span className="text-xs font-normal text-text-muted px-1.5 py-0.5 rounded bg-surface-raised border border-line">V2 MVP</span></span>
+              <Link href="/" className="transition-opacity hover:opacity-90">
+                <PeribolosLogo size={28} showBadge={true} />
               </Link>
               <nav className="hidden items-center gap-5 text-xs font-medium text-text-muted md:flex">
                 <Link href="/app" prefetch={true} className="transition-colors hover:text-text">Dashboard</Link>
