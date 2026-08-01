@@ -13,7 +13,7 @@
  * an address they already control.
  */
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 import {
   isAddress,
@@ -55,9 +55,11 @@ function fieldClass(invalid: boolean): string {
 }
 
 export function CreateDomainWizard({
+  initialAgentAddress,
   onCreated,
 }: {
-  onCreated: (vault: Address) => void;
+  initialAgentAddress?: Address | null;
+  onCreated: (vault: Address, context: { ownerAddress: Address; agentSignerAddress: Address }) => void;
 }) {
   const { address: owner, isConnected, method, writeVault } = useSession();
 
@@ -99,6 +101,13 @@ export function CreateDomainWizard({
   const [createdVault, setCreatedVault] = useState<Address | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [envCopied, setEnvCopied] = useState(false);
+
+  useEffect(() => {
+    if (initialAgentAddress && isAddress(initialAgentAddress)) {
+      setKeyMode("paste");
+      setPastedAgent(initialAgentAddress);
+    }
+  }, [initialAgentAddress]);
 
   const canSubmit =
     isConnected &&
@@ -272,7 +281,14 @@ export function CreateDomainWizard({
         </div>
 
         <button
-          onClick={() => onCreated(createdVault)}
+          onClick={() => {
+            if (owner && agentAddress) {
+              onCreated(createdVault, {
+                ownerAddress: owner as Address,
+                agentSignerAddress: agentAddress,
+              });
+            }
+          }}
           className="rounded-full bg-accent px-4 py-2 text-sm font-medium text-surface transition-colors hover:bg-accent-deep"
         >
           Open this vault
@@ -356,7 +372,7 @@ export function CreateDomainWizard({
             <input
               value={pastedAgent}
               onChange={(e) => setPastedAgent(e.target.value)}
-              placeholder="0x… agent address you control"
+              placeholder="0x... managed signer from Agents"
               className={`mt-3 ${fieldClass(pastedAgent.length > 0 && !isAddress(pastedAgent))}`}
             />
           )}
@@ -522,9 +538,7 @@ export function CreateDomainWizard({
           {!isConnected
             ? "Sign in to create"
             : submitting
-              ? method === "passkey"
-                ? "Approve with passkey…"
-                : "Confirm and deploy…"
+              ? "Confirm and deploy…"
               : "Create domain — one transaction"}
         </button>
         {txHash && !createdVault && (

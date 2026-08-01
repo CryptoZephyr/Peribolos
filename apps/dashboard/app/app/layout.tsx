@@ -2,7 +2,9 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { Providers } from "@/app/providers";
 import { ConnectButton } from "@/app/app/components/ConnectButton";
+import { ApiKeySetup } from "@/app/app/components/ApiKeySetup";
 import { PeribolosLogo } from "@/app/components/PeribolosLogo";
+import { AppAuthGate } from "@/app/app/components/AppAuthGate";
 
 export default function AppLayout({ children }: { children: ReactNode }) {
   return (
@@ -28,6 +30,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
               </nav>
             </div>
             <div className="flex items-center gap-3">
+              <ApiKeySetup />
               <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 text-xs font-medium text-emerald-400">
                 <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
                 Arc Testnet (5042002)
@@ -51,7 +54,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
           </div>
         </div>
 
-        <main className="mx-auto max-w-[1280px] px-6 py-8 flex-1 w-full">{children}</main>
+        <main className="mx-auto max-w-[1280px] px-6 py-8 flex-1 w-full"><AppAuthGate>{children}</AppAuthGate></main>
 
         <footer className="border-t border-line py-6 text-center text-xs text-text-muted">
           Peribolos Spending Control Platform • Powered by Arc & Circle • Contract-Enforced Financial Safety

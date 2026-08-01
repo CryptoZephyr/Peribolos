@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
-import { Providers } from "@/app/providers";
+import { SupabaseAuthProvider } from "@/app/auth/SupabaseAuthProvider";
 
 export default function LoginLayout({ children }: { children: ReactNode }) {
-  return <Providers>{children}</Providers>;
+  return <SupabaseAuthProvider>{children}</SupabaseAuthProvider>;
 }

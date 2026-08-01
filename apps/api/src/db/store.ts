@@ -16,6 +16,7 @@ export interface User {
   name: string;
   role: 'owner' | 'admin' | 'member';
   createdAt: string;
+  externalAuthId?: string;
 }
 
 export interface Agent {
@@ -58,10 +59,13 @@ export interface ManagedSignerRecord {
   vaultId: string;
   agentId: string;
   address: `0x${string}`;
-  encryptedPrivateKey: string; // AES-256-GCM
-  iv: string;
-  authTag: string;
-  status: 'active' | 'rotated' | 'revoked';
+  /** Circle wallet id when provider is circle; empty for legacy local signers. */
+  walletId?: string;
+  provider?: 'circle' | 'local';
+  encryptedPrivateKey?: string; // AES-256-GCM (legacy/local fallback)
+  iv?: string;
+  authTag?: string;
+  status: 'active' | 'pending' | 'rotated' | 'revoked';
   createdAt: string;
   rotatedAt?: string;
 }
@@ -86,6 +90,8 @@ export interface ApiKeyRecord {
   keyPrefix: string; // e.g. pb_live_a1b2
   keyHash: string; // SHA-256 of raw key
   name: string;
+  /** operator keys manage a workspace; agent keys are payment-only credentials. */
+  role?: 'operator' | 'agent';
   status: 'active' | 'revoked';
   lastUsedAt?: string;
   createdAt: string;
@@ -139,18 +145,42 @@ export interface DbSchema {
   chainEvents: ChainEventRecord[];
 }
 
-const DB_FILE = path.join(process.cwd(), 'data', 'db.json');
+export const DB_FILE = process.env.PERIBOLOS_DB_FILE || path.join(process.cwd(), 'data', 'db.json');
+const DEMO_RAW_KEY = 'pb_live_demo1234567890abcdef1234567890abcdef';
+
+function shouldSeedDemoData(): boolean {
+  return process.env.NODE_ENV !== 'production' && process.env.PERIBOLOS_SEED_DEMO !== '0';
+}
 
 class DatabaseStore {
   private data: DbSchema;
 
   constructor() {
     this.data = this.load();
+    this.normalizeApiKeyRoles();
     if (this.data.workspaces.length === 0) {
       this.seedDefaults();
     }
     this.normalizeVaults();
-    this.ensureDemoData();
+    if (shouldSeedDemoData()) {
+      this.ensureDemoData();
+    } else {
+      this.revokeDemoApiKeys();
+    }
+    this.ensureBootstrapApiKey();
+  }
+
+  private normalizeApiKeyRoles(): void {
+    let changed = false;
+    for (const key of this.data.apiKeys) {
+      if (!key.role) {
+        key.role = key.id === 'key_demo' || key.name.toLowerCase().includes('bootstrap')
+          ? 'operator'
+          : 'agent';
+        changed = true;
+      }
+    }
+    if (changed) this.save();
   }
 
   /** Backfill mode for vaults created before the integrity fix. */
@@ -170,8 +200,7 @@ class DatabaseStore {
     const wsId = 'ws_default';
     const agentId = 'ag_demo';
     const vaultId = 'v_demo';
-    const demoRawKey = 'pb_live_demo1234567890abcdef1234567890abcdef';
-    const demoKeyHash = crypto.createHash('sha256').update(demoRawKey).digest('hex');
+    const demoKeyHash = crypto.createHash('sha256').update(DEMO_RAW_KEY).digest('hex');
 
     if (!this.getApiKeyByHash(demoKeyHash)) {
       this.data.apiKeys.push({
@@ -181,6 +210,7 @@ class DatabaseStore {
         keyPrefix: 'pb_live_demo',
         keyHash: demoKeyHash,
         name: 'Demo Agent API Key',
+        role: 'operator',
         status: 'active',
         createdAt: new Date().toISOString()
       });
@@ -263,6 +293,31 @@ class DatabaseStore {
     }
   }
 
+  public getOrCreateExternalWorkspace(externalAuthId: string, email: string): string {
+    const existing = this.data.users.find((user) => user.externalAuthId === externalAuthId);
+    if (existing) return existing.workspaceId;
+    const workspaceId = `ws_${crypto.createHash('sha256').update(externalAuthId).digest('hex').slice(0, 16)}`;
+    if (!this.data.workspaces.some((workspace) => workspace.id === workspaceId)) {
+      this.data.workspaces.push({
+        id: workspaceId,
+        name: `${email.split('@')[0] || 'New'} Workspace`,
+        slug: workspaceId.slice(3),
+        createdAt: new Date().toISOString(),
+      });
+    }
+    this.data.users.push({
+      id: `user_${externalAuthId.slice(0, 20)}`,
+      workspaceId,
+      email,
+      name: email.split('@')[0] || 'Workspace owner',
+      role: 'owner',
+      externalAuthId,
+      createdAt: new Date().toISOString(),
+    });
+    this.save();
+    return workspaceId;
+  }
+
   private seedDefaults(): void {
     const wsId = 'ws_default';
     const agentId = 'ag_demo';
@@ -338,20 +393,67 @@ class DatabaseStore {
       }
     );
 
-    const demoRawKey = 'pb_live_demo1234567890abcdef1234567890abcdef';
-    const demoKeyHash = crypto.createHash('sha256').update(demoRawKey).digest('hex');
-
-    this.data.apiKeys.push({
-      id: 'key_demo',
-      workspaceId: wsId,
-      agentId: agentId,
-      keyPrefix: 'pb_live_demo',
+    if (shouldSeedDemoData()) {
+      const demoKeyHash = crypto.createHash('sha256').update(DEMO_RAW_KEY).digest('hex');
+      this.data.apiKeys.push({
+        id: 'key_demo',
+        workspaceId: wsId,
+        agentId: agentId,
+        keyPrefix: 'pb_live_demo',
       keyHash: demoKeyHash,
       name: 'Demo Agent API Key',
+      role: 'operator',
+      status: 'active',
+        createdAt: new Date().toISOString()
+      });
+    }
+
+    this.save();
+  }
+
+  private revokeDemoApiKeys(): void {
+    let dirty = false;
+    for (const key of this.data.apiKeys) {
+      if (key.id === 'key_demo' || key.keyPrefix === 'pb_live_demo') {
+        key.status = 'revoked';
+        dirty = true;
+      }
+    }
+    if (dirty) this.save();
+  }
+
+  private ensureBootstrapApiKey(): void {
+    const rawKey = process.env.PERIBOLOS_BOOTSTRAP_API_KEY?.trim();
+    if (!rawKey) return;
+
+    const workspaceId = process.env.PERIBOLOS_BOOTSTRAP_WORKSPACE_ID || 'ws_default';
+    const agentId = process.env.PERIBOLOS_BOOTSTRAP_AGENT_ID || 'ag_bootstrap';
+    const keyHash = crypto.createHash('sha256').update(rawKey).digest('hex');
+    if (this.getApiKeyByHash(keyHash)) return;
+
+    if (!this.data.agents.find(a => a.id === agentId)) {
+      this.data.agents.push({
+        id: agentId,
+        workspaceId,
+        name: 'Bootstrap Admin Agent',
+        description: 'Operator-provided bootstrap API principal',
+        framework: 'custom',
+        status: 'active',
+        createdAt: new Date().toISOString()
+      });
+    }
+
+    this.data.apiKeys.push({
+      id: `key_bootstrap_${crypto.randomBytes(4).toString('hex')}`,
+      workspaceId,
+      agentId,
+      keyPrefix: rawKey.substring(0, 12),
+      keyHash,
+      name: 'Bootstrap API Key',
+      role: 'operator',
       status: 'active',
       createdAt: new Date().toISOString()
     });
-
     this.save();
   }
 
@@ -372,8 +474,11 @@ class DatabaseStore {
   public getPayees(wsId?: string) {
     return wsId ? this.data.payees.filter(p => p.workspaceId === wsId) : this.data.payees;
   }
-  public getPayeeByAddress(address: string) {
-    return this.data.payees.find(p => p.address.toLowerCase() === address.toLowerCase());
+  public getPayeeByAddress(address: string, wsId?: string) {
+    return this.data.payees.find(p =>
+      p.address.toLowerCase() === address.toLowerCase() &&
+      (!wsId || p.workspaceId === wsId)
+    );
   }
   public getApiKeys(wsId?: string) {
     return wsId ? this.data.apiKeys.filter(k => k.workspaceId === wsId) : this.data.apiKeys;
@@ -411,6 +516,28 @@ class DatabaseStore {
   public getManagedSignerByVault(vaultId: string) {
     return this.data.managedSigners.find(s => s.vaultId === vaultId && s.status === 'active');
   }
+  public getManagedSignerByAddress(address: string, status?: ManagedSignerRecord['status']) {
+    const normalized = address.toLowerCase();
+    return this.data.managedSigners.find(s =>
+      s.address.toLowerCase() === normalized && (!status || s.status === status)
+    );
+  }
+  public promoteManagedSigner(agentId: string, address: string): ManagedSignerRecord | undefined {
+    const normalized = address.toLowerCase();
+    const next = this.data.managedSigners.find(s =>
+      s.agentId === agentId && s.address.toLowerCase() === normalized && s.status === 'pending'
+    );
+    if (!next) return undefined;
+    for (const signer of this.data.managedSigners) {
+      if (signer.agentId === agentId && signer.status === 'active') {
+        signer.status = 'rotated';
+        signer.rotatedAt = new Date().toISOString();
+      }
+    }
+    next.status = 'active';
+    this.save();
+    return next;
+  }
   public revokeManagedSigner(agentId: string): boolean {
     const existing = this.data.managedSigners.find(s => s.agentId === agentId && s.status === 'active');
     if (!existing) return false;
@@ -434,12 +561,30 @@ class DatabaseStore {
     this.data.paymentRequests.unshift(pr);
     this.save();
   }
+  public addPaymentRequestIfAbsent(pr: PaymentRequestRecord) {
+    const existing = this.getPaymentRequestByIdempotency(pr.workspaceId, pr.idempotencyKey);
+    if (existing) return existing;
+    this.data.paymentRequests.unshift(pr);
+    this.save();
+    return pr;
+  }
+  public updatePaymentRequest(id: string, updates: Partial<PaymentRequestRecord>) {
+    const idx = this.data.paymentRequests.findIndex(pr => pr.id === id);
+    if (idx === -1) return undefined;
+    this.data.paymentRequests[idx] = {
+      ...this.data.paymentRequests[idx],
+      ...updates,
+      updatedAt: new Date().toISOString()
+    };
+    this.save();
+    return this.data.paymentRequests[idx];
+  }
   public getPaymentRequestByIdempotency(wsId: string, idempotencyKey: string) {
     return this.data.paymentRequests.find(pr => pr.workspaceId === wsId && pr.idempotencyKey === idempotencyKey);
   }
   public addChainEvent(evt: ChainEventRecord) {
-    // Avoid duplicate event insertions by txHash + eventType
-    const exists = this.data.chainEvents.some(e => e.txHash === evt.txHash && e.eventType === evt.eventType);
+    // Avoid duplicate event insertions by stable event id.
+    const exists = this.data.chainEvents.some(e => e.id === evt.id);
     if (!exists) {
       this.data.chainEvents.unshift(evt);
       this.save();

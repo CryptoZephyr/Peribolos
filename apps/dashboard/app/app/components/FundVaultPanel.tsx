@@ -9,7 +9,6 @@
 
 import { useEffect, useState } from "react";
 import { parseEther, type Address, type Hex } from "viem";
-import { useSendTransaction, useWaitForTransactionReceipt } from "wagmi";
 import { FAUCET_URL, txUrl, shortAddress } from "@/lib/chain";
 import { fetchApi } from "@/lib/api-client";
 import { useSession } from "../session";
@@ -26,19 +25,13 @@ export function FundVaultPanel({
   mode: "offline" | "live";
   onFunded?: () => void;
 }) {
-  const { isConnected, connectWallet, address } = useSession();
+  const { isConnected, connectWallet, address, sendNative } = useSession();
   const [amount, setAmount] = useState("5");
   const [error, setError] = useState<string | null>(null);
   const [recordedHash, setRecordedHash] = useState<string | null>(null);
-
-  const { sendTransaction, data: txHash, isPending, reset, error: sendError } = useSendTransaction();
-  const { isLoading: confirming, isSuccess } = useWaitForTransactionReceipt({
-    hash: txHash,
-  });
-
-  useEffect(() => {
-    if (sendError) setError(describeError(sendError));
-  }, [sendError]);
+  const [txHash, setTxHash] = useState<Hex | null>(null);
+  const [isPending, setIsPending] = useState(false);
+  const [isSuccess, setIsSuccess] = useState(false);
 
   useEffect(() => {
     if (!isSuccess || !txHash || recordedHash === txHash) return;
@@ -55,7 +48,7 @@ export function FundVaultPanel({
       .catch((err) => console.warn("Fund record failed:", err));
   }, [isSuccess, txHash, recordedHash, vaultId, amount, address, onFunded]);
 
-  function fund() {
+  async function fund() {
     setError(null);
     if (!isConnected) {
       connectWallet();
@@ -76,12 +69,14 @@ export function FundVaultPanel({
     }
     try {
       // Arc native USDC uses 18-decimal wei representation for msg.value
-      sendTransaction({
-        to: vaultAddress,
-        value: parseEther(amount),
-      });
+      setIsPending(true);
+      const hash = await sendNative(vaultAddress, parseEther(amount));
+      setTxHash(hash);
+      setIsSuccess(true);
     } catch (err) {
       setError(describeError(err));
+    } finally {
+      setIsPending(false);
     }
   }
 
@@ -113,7 +108,8 @@ export function FundVaultPanel({
             value={amount}
             onChange={(e) => {
               setAmount(e.target.value);
-              reset();
+              setTxHash(null);
+              setIsSuccess(false);
               setRecordedHash(null);
             }}
             className="w-full rounded-md border border-line bg-surface-raised px-3 py-2 text-xs font-mono"
@@ -121,12 +117,12 @@ export function FundVaultPanel({
         </div>
         <button
           onClick={fund}
-          disabled={isPending || confirming}
+          disabled={isPending}
           className="rounded-md bg-accent px-4 py-2 text-xs font-semibold text-white disabled:opacity-50"
         >
           {!isConnected
             ? "Connect wallet to fund"
-            : isPending || confirming
+            : isPending
               ? "Confirming…"
               : "Fund vault"}
         </button>

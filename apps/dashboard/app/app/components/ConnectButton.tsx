@@ -55,13 +55,15 @@ export function ConnectButton() {
   }
 
   return (
-    <button
-      onClick={connectWallet}
-      disabled={walletConnecting}
-      className="flex items-center gap-2 rounded-full bg-accent px-3.5 py-1.5 text-sm font-medium text-surface transition-colors hover:bg-accent-deep disabled:cursor-not-allowed disabled:opacity-60"
-    >
-      <Wallet size={16} weight="bold" />
-      {walletConnecting ? "Connecting…" : "Connect wallet"}
-    </button>
+    <div className="flex items-center gap-2">
+      <button
+        onClick={connectWallet}
+        disabled={walletConnecting}
+        className="flex items-center gap-2 rounded-full bg-accent px-3.5 py-1.5 text-sm font-medium text-surface transition-colors hover:bg-accent-deep disabled:cursor-not-allowed disabled:opacity-60"
+      >
+        <Wallet size={16} weight="bold" />
+        {walletConnecting ? "Connecting…" : "Connect wallet"}
+      </button>
+    </div>
   );
 }
