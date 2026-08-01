@@ -70,7 +70,9 @@ async function main() {
     agentPrivateKey,
     rpcUrl: process.env.RPC_URL,
   });
-  const toolsByName = Object.fromEntries(tools.map((t) => [t.name, t]));
+  type DemoTool = { name: string; invoke: (args: unknown) => Promise<string> };
+  const typedTools = tools as unknown as DemoTool[];
+  const toolsByName = Object.fromEntries(typedTools.map((tool) => [tool.name, tool]));
 
   const llm = new ChatOpenAI({
     model,

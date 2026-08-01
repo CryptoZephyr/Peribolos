@@ -1,6 +1,5 @@
 "use client";
 
-import React from "react";
 import Link from "next/link";
 
 export interface OnboardingState {
@@ -16,14 +15,14 @@ export function OnboardingWizard({ state }: { state: OnboardingState }) {
     {
       id: 1,
       title: "1. Provision Agent",
-      desc: "Create agent & server-side signer",
+      desc: "Create agent & Circle signer",
       link: "/app/agents",
       completed: state.hasAgent,
     },
     {
       id: 2,
       title: "2. Create & Fund Vault",
-      desc: "On-chain vault + USDC balance",
+      desc: "Owner deploys live Arc vault",
       link: "/app/vaults",
       completed: state.hasVault,
     },

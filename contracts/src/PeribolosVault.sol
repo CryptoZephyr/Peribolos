@@ -75,6 +75,8 @@ contract PeribolosVault {
     uint16 public feeBps;
     /// @notice Recipient of protocol fees when feeBps > 0.
     address public feeRecipient;
+    /// @notice Protocol fees accrued from successful pays and reserved from sweeps/owner withdrawals.
+    uint256 public accruedProtocolFees;
 
     mapping(address => bool) public allowlist;
 
@@ -118,6 +120,7 @@ contract PeribolosVault {
     error WithdrawTransferFailed();
     error ExpiryInPast();
     error FeeTooHigh();
+    error InsufficientUnreservedBalance();
 
     // ------------------------------------------------------------------
     // Modifiers
@@ -203,24 +206,14 @@ contract PeribolosVault {
         uint256 fee = feeBps == 0 ? 0 : (amount * uint256(feeBps)) / 10_000;
         uint256 net = amount - fee;
 
-        if (fee > 0) {
-            if (!_safeTransfer(feeRecipient, fee)) {
-                epochSpent = spentBefore;
-                emit PaymentBlocked(to, amount, actionType, BlockReason.TRANSFER_FAILED);
-                return false;
-            }
-        }
-
         if (!_safeTransfer(to, net)) {
-            // Fee already left the vault if fee > 0 (rare: feeRecipient ok,
-            // payee blocked). Roll back spend accounting; fee stays with
-            // feeRecipient. Keep feeBps=0 on testnet to avoid this edge case.
             epochSpent = spentBefore;
             emit PaymentBlocked(to, amount, actionType, BlockReason.TRANSFER_FAILED);
             return false;
         }
 
         if (fee > 0) {
+            accruedProtocolFees += fee;
             emit ProtocolFeeCollected(to, fee, net);
         }
         emit PaymentExecuted(to, amount, actionType, epochSpent);
@@ -264,8 +257,9 @@ contract PeribolosVault {
     ///      failure (e.g. blocklisted treasury) must surface, not be logged.
     function sweepIdle() external nonReentrant {
         uint256 balance = usdc.balanceOf(address(this));
-        if (balance <= floatAmount) return;
-        uint256 excess = balance - floatAmount;
+        uint256 unreserved = balance > accruedProtocolFees ? balance - accruedProtocolFees : 0;
+        if (unreserved <= floatAmount) return;
+        uint256 excess = unreserved - floatAmount;
         if (!usdc.transfer(treasury, excess)) revert SweepTransferFailed();
         emit Swept(treasury, excess);
     }
@@ -324,14 +318,30 @@ contract PeribolosVault {
     function setProtocolFee(uint16 feeBps_, address feeRecipient_) external onlyOwner {
         if (feeBps_ > 1_000) revert FeeTooHigh();
         if (feeBps_ > 0 && feeRecipient_ == address(0)) revert ZeroAddress();
+        if (accruedProtocolFees > 0 && feeRecipient_ == address(0)) revert ZeroAddress();
         feeBps = feeBps_;
         feeRecipient = feeRecipient_;
         emit ProtocolFeeUpdated(feeBps_, feeRecipient_);
     }
 
     function withdraw(uint256 amount) external onlyOwner nonReentrant {
+        uint256 balance = usdc.balanceOf(address(this));
+        uint256 unreserved = balance > accruedProtocolFees ? balance - accruedProtocolFees : 0;
+        if (amount > unreserved) revert InsufficientUnreservedBalance();
         if (!usdc.transfer(owner, amount)) revert WithdrawTransferFailed();
         emit Withdrawn(owner, amount);
+    }
+
+    function claimProtocolFees() external nonReentrant {
+        uint256 amount = accruedProtocolFees;
+        if (amount == 0) return;
+        if (feeRecipient == address(0)) revert ZeroAddress();
+        accruedProtocolFees = 0;
+        if (!usdc.transfer(feeRecipient, amount)) {
+            accruedProtocolFees = amount;
+            revert WithdrawTransferFailed();
+        }
+        emit Withdrawn(feeRecipient, amount);
     }
 
     // ------------------------------------------------------------------

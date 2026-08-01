@@ -1,6 +1,8 @@
 import { Router, Request, Response } from 'express';
 import crypto from 'node:crypto';
-import { db, VaultRecord, ApiKeyRecord, Agent } from '../db/store.js';
+import { formatUnits } from 'viem';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import { db, VaultRecord, ApiKeyRecord, Agent, PaymentRequestRecord } from '../db/store.js';
 import { signerService } from '../services/signer.js';
 import { preflightPolicyCheck } from '../services/policy.js';
 import { runPromptInjectionSimulation, INJECTION_FIXTURES } from '../services/simulation.js';
@@ -10,17 +12,62 @@ import {
   createAgentSchema,
   createPayeeSchema,
   updateVaultSchema,
-  fundVaultSchema
+  fundVaultSchema,
+  usdcAmountToUnits
 } from '../middleware/validation.js';
 
 export const v1Router = Router();
+
+let supabaseAuthClient: SupabaseClient | null | undefined;
+function getSupabaseAuthClient(): SupabaseClient | null {
+  if (supabaseAuthClient !== undefined) return supabaseAuthClient;
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;
+  supabaseAuthClient = url && key ? createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } }) : null;
+  return supabaseAuthClient;
+}
 
 function isValidAddress(addr: string): addr is `0x${string}` {
   return typeof addr === 'string' && /^0x[0-9a-fA-F]{40}$/.test(addr);
 }
 
-// Middleware: Authenticate Agent API Key (Bearer pb_live_...)
-export function authenticateApiKey(req: Request, res: Response, next: Function) {
+function sendCachedPayment(res: Response, existing: PaymentRequestRecord) {
+  return res.json({
+    id: existing.id,
+    idempotencyKey: existing.idempotencyKey,
+    status: existing.status,
+    amountUsdc: existing.amountUsdc,
+    payeeAddress: existing.payeeAddress,
+    payeeName: existing.payeeName,
+    blockReasonCode: existing.blockReasonCode,
+    blockReasonDescription: existing.blockReasonDescription,
+    txHash: existing.txHash,
+    explorerUrl: existing.txHash ? `https://testnet.arcscan.app/tx/${existing.txHash}` : undefined,
+    cached: true
+  });
+}
+
+function assertVaultInWorkspace(vaultId: string, workspaceId: string, res: Response): VaultRecord | undefined {
+  const vault = db.getVaultById(vaultId);
+  if (!vault) {
+    res.status(404).json({ error: 'NOT_FOUND', message: 'Vault not found' });
+    return undefined;
+  }
+  if (vault.workspaceId !== workspaceId) {
+    res.status(403).json({ error: 'FORBIDDEN', message: 'Vault does not belong to this workspace.' });
+    return undefined;
+  }
+  return vault;
+}
+
+function csvCell(value: unknown): string {
+  const raw = value === undefined || value === null ? '' : String(value);
+  const escapedFormula = /^[=+\-@]/.test(raw) ? `'${raw}` : raw;
+  return `"${escapedFormula.replace(/"/g, '""')}"`;
+}
+
+// Middleware: authenticate either an agent API key or a Supabase user session.
+export async function authenticateApiKey(req: Request, res: Response, next: Function) {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return res.status(401).json({
@@ -33,38 +80,47 @@ export function authenticateApiKey(req: Request, res: Response, next: Function) 
   const keyHash = crypto.createHash('sha256').update(rawKey).digest('hex');
   const apiKeyRecord = db.getApiKeyByHash(keyHash);
 
-  if (!apiKeyRecord) {
-    return res.status(401).json({
-      error: 'INVALID_API_KEY',
-      message: 'The provided API key is invalid or has been revoked.'
+  if (apiKeyRecord) {
+    apiKeyRecord.lastUsedAt = new Date().toISOString();
+    db.save();
+    (req as any).apiKey = apiKeyRecord;
+    (req as any).workspaceId = apiKeyRecord.workspaceId;
+    (req as any).agentId = apiKeyRecord.agentId;
+    return next();
+  }
+
+  const authClient = getSupabaseAuthClient();
+  if (!authClient) {
+    return res.status(401).json({ error: 'INVALID_API_KEY', message: 'The provided API key is invalid or has been revoked.' });
+  }
+  const { data, error } = await authClient.auth.getUser(rawKey);
+  if (error || !data.user) {
+    return res.status(401).json({ error: 'UNAUTHORIZED', message: 'The provided session is invalid or expired.' });
+  }
+  const email = data.user.email || `${data.user.id}@supabase.local`;
+  const workspaceId = db.getOrCreateExternalWorkspace(data.user.id, email);
+  (req as any).supabaseUser = data.user;
+  (req as any).workspaceId = workspaceId;
+  (req as any).authMode = 'supabase';
+  next();
+}
+
+/** Workspace-management actions require an operator key, not an agent payment key. */
+export function requireOperator(req: Request, res: Response, next: Function) {
+  const key = (req as any).apiKey as ApiKeyRecord | undefined;
+  if ((req as any).authMode !== 'supabase' && key?.role !== 'operator') {
+    return res.status(403).json({
+      error: 'OPERATOR_KEY_REQUIRED',
+      message: 'This workspace-management action requires an operator API key.'
     });
   }
-
-  apiKeyRecord.lastUsedAt = new Date().toISOString();
-  db.save();
-  (req as any).apiKey = apiKeyRecord;
-  (req as any).workspaceId = apiKeyRecord.workspaceId;
-  (req as any).agentId = apiKeyRecord.agentId;
   next();
 }
 
-export function optionalAuthenticateApiKey(req: Request, res: Response, next: Function) {
-  const authHeader = req.headers.authorization;
-  if (authHeader && authHeader.startsWith('Bearer ')) {
-    const rawKey = authHeader.substring(7).trim();
-    const keyHash = crypto.createHash('sha256').update(rawKey).digest('hex');
-    const apiKeyRecord = db.getApiKeyByHash(keyHash);
-    if (apiKeyRecord) {
-      apiKeyRecord.lastUsedAt = new Date().toISOString();
-      db.save();
-      (req as any).apiKey = apiKeyRecord;
-      (req as any).workspaceId = apiKeyRecord.workspaceId;
-      (req as any).agentId = apiKeyRecord.agentId;
-    }
-  }
-  next();
+function scopedAgentId(req: Request): string | undefined {
+  const key = (req as any).apiKey as ApiKeyRecord | undefined;
+  return key?.role === 'operator' ? undefined : (req as any).agentId as string | undefined;
 }
-
 
 /* ==========================================================================
    HOSTED PAYMENT API (PHASE 3)
@@ -72,6 +128,9 @@ export function optionalAuthenticateApiKey(req: Request, res: Response, next: Fu
    ========================================================================== */
 v1Router.post('/payments', authenticateApiKey, validateBody(paymentSchema), async (req: Request, res: Response) => {
   try {
+    if (!(req as any).apiKey) {
+      return res.status(403).json({ error: 'AGENT_API_KEY_REQUIRED', message: 'Payments require the agent API key, not a user session.' });
+    }
     const { payeeAddress, amountUsdc, actionType, idempotencyKey, metadataHash } = req.body;
     const workspaceId = (req as any).workspaceId as string;
     const agentId = (req as any).agentId as string;
@@ -81,19 +140,7 @@ v1Router.post('/payments', authenticateApiKey, validateBody(paymentSchema), asyn
     // Check Idempotency
     const existing = db.getPaymentRequestByIdempotency(workspaceId, effectiveIdempotencyKey);
     if (existing) {
-      return res.json({
-        id: existing.id,
-        idempotencyKey: existing.idempotencyKey,
-        status: existing.status,
-        amountUsdc: existing.amountUsdc,
-        payeeAddress: existing.payeeAddress,
-        payeeName: existing.payeeName,
-        blockReasonCode: existing.blockReasonCode,
-        blockReasonDescription: existing.blockReasonDescription,
-        txHash: existing.txHash,
-        explorerUrl: existing.txHash ? `https://testnet.arcscan.app/tx/${existing.txHash}` : undefined,
-        cached: true
-      });
+      return sendCachedPayment(res, existing);
     }
 
     // Get Agent & Vault — do NOT auto-provision dummy vaults on pay
@@ -130,7 +177,7 @@ v1Router.post('/payments', authenticateApiKey, validateBody(paymentSchema), asyn
         vaultId: vault.id,
         idempotencyKey: effectiveIdempotencyKey,
         payeeAddress: payeeAddrFormatted,
-        payeeName: db.getPayeeByAddress(payeeAddrFormatted)?.name || 'Unknown Payee',
+        payeeName: db.getPayeeByAddress(payeeAddrFormatted, workspaceId)?.name || 'Unknown Payee',
         amountUsdc,
         actionType: actionType ?? 1,
         metadataHash: metaHashFormatted,
@@ -140,7 +187,8 @@ v1Router.post('/payments', authenticateApiKey, validateBody(paymentSchema), asyn
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       };
-      db.addPaymentRequest(prRecord);
+      const reserved = db.addPaymentRequestIfAbsent(prRecord);
+      if (reserved.id !== prRecord.id) return sendCachedPayment(res, reserved);
 
       return res.status(403).json({
         id: prRecord.id,
@@ -164,7 +212,7 @@ v1Router.post('/payments', authenticateApiKey, validateBody(paymentSchema), asyn
         vaultId: vault.id,
         idempotencyKey: effectiveIdempotencyKey,
         payeeAddress: payeeAddrFormatted,
-        payeeName: db.getPayeeByAddress(payeeAddrFormatted)?.name || 'Approved Payee',
+        payeeName: db.getPayeeByAddress(payeeAddrFormatted, workspaceId)?.name || 'Approved Payee',
         amountUsdc,
         actionType: actionType ?? 1,
         metadataHash: metaHashFormatted,
@@ -175,7 +223,8 @@ v1Router.post('/payments', authenticateApiKey, validateBody(paymentSchema), asyn
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       };
-      db.addPaymentRequest(prRecord);
+      const reserved = db.addPaymentRequestIfAbsent(prRecord);
+      if (reserved.id !== prRecord.id) return sendCachedPayment(res, reserved);
 
       return res.status(200).json({
         id: prRecord.id,
@@ -204,7 +253,7 @@ v1Router.post('/payments', authenticateApiKey, validateBody(paymentSchema), asyn
         vaultId: vault.id,
         idempotencyKey: effectiveIdempotencyKey,
         payeeAddress: payeeAddrFormatted,
-        payeeName: db.getPayeeByAddress(payeeAddrFormatted)?.name || 'Approved Payee',
+        payeeName: db.getPayeeByAddress(payeeAddrFormatted, workspaceId)?.name || 'Approved Payee',
         amountUsdc,
         actionType: actionType ?? 1,
         metadataHash: metaHashFormatted,
@@ -214,7 +263,8 @@ v1Router.post('/payments', authenticateApiKey, validateBody(paymentSchema), asyn
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       };
-      db.addPaymentRequest(prRecord);
+      const reserved = db.addPaymentRequestIfAbsent(prRecord);
+      if (reserved.id !== prRecord.id) return sendCachedPayment(res, reserved);
       return res.status(200).json({
         id: prRecord.id,
         status: 'FAILED',
@@ -225,7 +275,24 @@ v1Router.post('/payments', authenticateApiKey, validateBody(paymentSchema), asyn
       });
     }
 
-    const amountUsdcUnits = BigInt(Math.floor(amountUsdc * 1e6));
+    const pendingRecord = db.addPaymentRequestIfAbsent({
+      id: `pr_${crypto.randomBytes(8).toString('hex')}`,
+      workspaceId,
+      agentId,
+      vaultId: vault.id,
+      idempotencyKey: effectiveIdempotencyKey,
+      payeeAddress: payeeAddrFormatted,
+      payeeName: db.getPayeeByAddress(payeeAddrFormatted, workspaceId)?.name || 'Approved Payee',
+      amountUsdc,
+      actionType: actionType ?? 1,
+      metadataHash: metaHashFormatted,
+      status: 'PENDING',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    });
+    if (pendingRecord.status !== 'PENDING') return sendCachedPayment(res, pendingRecord);
+
+    const amountUsdcUnits = usdcAmountToUnits(amountUsdc);
     const execution = await signerService.executeVaultPay({
       vaultAddress: vault.address,
       signerRecord,
@@ -235,25 +302,12 @@ v1Router.post('/payments', authenticateApiKey, validateBody(paymentSchema), asyn
       metadataHash: metaHashFormatted
     });
 
-    const prRecord = {
-      id: `pr_${crypto.randomBytes(8).toString('hex')}`,
-      workspaceId,
-      agentId,
-      vaultId: vault.id,
-      idempotencyKey: effectiveIdempotencyKey,
-      payeeAddress: payeeAddrFormatted,
-      payeeName: db.getPayeeByAddress(payeeAddrFormatted)?.name || 'Approved Payee',
-      amountUsdc,
-      actionType: actionType ?? 1,
-      metadataHash: metaHashFormatted,
+    const prRecord = db.updatePaymentRequest(pendingRecord.id, {
       status: execution.status,
       blockReasonCode: execution.reasonCode,
       blockReasonDescription: execution.reasonDescription,
-      txHash: execution.txHash,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    };
-    db.addPaymentRequest(prRecord);
+      txHash: execution.txHash
+    })!;
 
     const httpStatus = execution.status === 'BLOCKED' ? 403 : 200;
     return res.status(httpStatus).json({
@@ -280,7 +334,7 @@ v1Router.post('/payments', authenticateApiKey, validateBody(paymentSchema), asyn
 v1Router.get('/payments/:id', authenticateApiKey, (req: Request, res: Response) => {
   const prs = db.getPaymentRequests((req as any).workspaceId);
   const found = prs.find(p => p.id === req.params.id);
-  if (!found) {
+  if (!found || (scopedAgentId(req) && found.agentId !== scopedAgentId(req))) {
     return res.status(404).json({ error: 'NOT_FOUND', message: 'Payment request not found' });
   }
   return res.json(found);
@@ -289,16 +343,18 @@ v1Router.get('/payments/:id', authenticateApiKey, (req: Request, res: Response) 
 /* ==========================================================================
    PROMPT INJECTION SIMULATIONS (PHASE 6)
    ========================================================================== */
-v1Router.get('/simulations/scenarios', (_req: Request, res: Response) => {
+v1Router.get('/simulations/scenarios', authenticateApiKey, (_req: Request, res: Response) => {
   return res.json(INJECTION_FIXTURES);
 });
 
-v1Router.post('/simulations/prompt-injection', (req: Request, res: Response) => {
+v1Router.post('/simulations/prompt-injection', authenticateApiKey, (req: Request, res: Response) => {
   const { scenarioId, vaultId } = req.body;
-  const vaults = db.getVaults();
-  const vault = (vaultId && db.getVaultById(vaultId)) || vaults[0];
+  const workspaceId = (req as any).workspaceId as string;
+  const vaults = db.getVaults(workspaceId);
+  const requestedVault = vaultId && db.getVaultById(vaultId);
+  const vault = requestedVault || vaults.find(v => !scopedAgentId(req) || v.agentId === scopedAgentId(req));
 
-  if (!vault) {
+  if (!vault || vault.workspaceId !== workspaceId || (scopedAgentId(req) && vault.agentId !== scopedAgentId(req))) {
     return res.status(400).json({ error: 'NO_VAULT', message: 'No vault available for simulation' });
   }
 
@@ -317,21 +373,25 @@ v1Router.post('/simulations/prompt-injection', (req: Request, res: Response) => 
 /* ==========================================================================
    ACTIVITY & AUDIT EXPORT (PHASE 5)
    ========================================================================== */
-v1Router.get('/activity', (req: Request, res: Response) => {
-  const wsId = (req.query.workspaceId as string) || 'ws_default';
+v1Router.get('/activity', authenticateApiKey, (req: Request, res: Response) => {
+  const wsId = (req as any).workspaceId as string;
   const statusFilter = req.query.status as string | undefined;
   let prs = db.getPaymentRequests(wsId);
+  const agentId = scopedAgentId(req);
+  if (agentId) prs = prs.filter(p => p.agentId === agentId);
   if (statusFilter) {
     prs = prs.filter(p => p.status === statusFilter);
   }
-  const chainEvents = db.getChainEvents();
+  const workspaceVaults = new Set(db.getVaults(wsId).map(v => v.address.toLowerCase()));
+  const chainEvents = db.getChainEvents().filter(e => workspaceVaults.has(e.vaultAddress.toLowerCase()));
   return res.json({ paymentRequests: prs, chainEvents });
 });
 
-v1Router.get('/audit/export', (req: Request, res: Response) => {
+v1Router.get('/audit/export', authenticateApiKey, (req: Request, res: Response) => {
   const format = (req.query.format as string) || 'csv';
-  const wsId = (req.query.workspaceId as string) || 'ws_default';
-  const prs = db.getPaymentRequests(wsId);
+  const wsId = (req as any).workspaceId as string;
+  const agentId = scopedAgentId(req);
+  const prs = db.getPaymentRequests(wsId).filter(p => !agentId || p.agentId === agentId);
 
   if (format === 'json') {
     res.setHeader('Content-Type', 'application/json');
@@ -359,13 +419,13 @@ v1Router.get('/audit/export', (req: Request, res: Response) => {
       p.agentId,
       p.vaultId,
       p.payeeAddress,
-      `"${p.payeeName || ''}"`,
+      p.payeeName || '',
       p.amountUsdc,
       p.actionType,
       p.status,
       p.blockReasonCode || '',
       p.txHash || ''
-    ].join(',')
+    ].map(csvCell).join(',')
   );
 
   const csv = [headers.join(','), ...rows].join('\n');
@@ -377,18 +437,69 @@ v1Router.get('/audit/export', (req: Request, res: Response) => {
 /* ==========================================================================
    DASHBOARD V2 MANAGEMENT API ENDPOINTS (PHASE 4)
    ========================================================================== */
-v1Router.get('/workspaces', (_req: Request, res: Response) => {
-  return res.json(db.getWorkspaces());
+v1Router.get('/setup/status', authenticateApiKey, requireOperator, (_req: Request, res: Response) => {
+  return res.json({
+    signer: signerService.getReadiness(),
+    vaultExecution: {
+      network: 'Arc Testnet',
+      chainId: 5042002,
+      authorizationModel:
+        'Agents initiate vault.pay; the on-chain PeribolosVault enforces allowlist, caps, pause, expiry, and balance before any USDC moves.',
+    },
+  });
 });
 
-v1Router.get('/agents', (req: Request, res: Response) => {
-  const wsId = (req.query.workspaceId as string) || 'ws_default';
-  return res.json(db.getAgents(wsId));
+/**
+ * Return safe, workspace-scoped signer linkage metadata.  This deliberately
+ * omits Circle wallet ids and all key material; the active address and the
+ * vault's recorded agent key are enough for an operator to fund and verify
+ * the correct wallet after a rotation.
+ */
+v1Router.get('/signers/status', authenticateApiKey, requireOperator, (req: Request, res: Response) => {
+  const workspaceId = (req as any).workspaceId as string;
+  const agents = db.getAgents(workspaceId);
+  const rows = agents.map(agent => {
+    const vault = db.getVaults(workspaceId).find(candidate => candidate.agentId === agent.id);
+    const signer = db.getManagedSignerByAgent(agent.id);
+    const activeSignerAddress = signer?.address;
+    const vaultSignerAddress = vault?.agentSignerAddress;
+    return {
+      agentId: agent.id,
+      vaultId: vault?.id,
+      vaultAddress: vault?.address,
+      vaultMode: vault?.mode,
+      activeSignerAddress,
+      provider: signer?.provider || (signer ? 'local' : undefined),
+      signerStatus: signer?.status,
+      dbAligned: Boolean(
+        activeSignerAddress && vaultSignerAddress &&
+        activeSignerAddress.toLowerCase() === vaultSignerAddress.toLowerCase()
+      ),
+      vaultSignerAddress,
+    };
+  });
+
+  return res.json({
+    network: 'Arc Testnet',
+    chainId: 5042002,
+    agents: rows,
+  });
 });
 
-v1Router.post('/agents', optionalAuthenticateApiKey, validateBody(createAgentSchema), (req: Request, res: Response) => {
-  const { name, description, framework, workspaceId, vaultAddress, ownerAddress } = req.body;
-  const wsId = workspaceId || 'ws_default';
+v1Router.get('/workspaces', authenticateApiKey, requireOperator, (req: Request, res: Response) => {
+  const wsId = (req as any).workspaceId as string;
+  return res.json(db.getWorkspaces().filter(w => w.id === wsId));
+});
+
+v1Router.get('/agents', authenticateApiKey, (req: Request, res: Response) => {
+  const wsId = (req as any).workspaceId as string;
+  const agentId = scopedAgentId(req);
+  return res.json(db.getAgents(wsId).filter(agent => !agentId || agent.id === agentId));
+});
+
+v1Router.post('/agents', authenticateApiKey, requireOperator, validateBody(createAgentSchema), async (req: Request, res: Response) => {
+  const { name, description, framework, vaultAddress, ownerAddress } = req.body;
+  const wsId = (req as any).workspaceId as string;
   const agentId = `ag_${crypto.randomBytes(8).toString('hex')}`;
   const vaultId = `v_${crypto.randomBytes(8).toString('hex')}`;
 
@@ -401,13 +512,43 @@ v1Router.post('/agents', optionalAuthenticateApiKey, validateBody(createAgentSch
     status: 'active',
     createdAt: new Date().toISOString()
   };
-  db.addAgent(agent);
-
-  // Provision managed signer server-side only (key never leaves API)
-  const { address: signerAddress } = signerService.provisionSigner(vaultId, agentId);
-
-  // Live only when a real vault address is provided; otherwise honest offline mode
+  // Provision the signer before publishing the agent record. In Circle mode this
+  // creates an Arc Testnet DCW asynchronously; local mode remains available for
+  // offline development.
+  let signerAddress: `0x${string}`;
+  try {
+    ({ address: signerAddress } = await signerService.provisionSigner(vaultId, agentId));
+  } catch (err) {
+    return res.status(503).json({
+      error: 'SIGNER_PROVISIONING_FAILED',
+      message: err instanceof Error ? err.message : 'Unable to provision an agent signer.'
+    });
+  }
+  // Live only when a real, compatible Arc vault is provided; otherwise honest offline mode.
   const live = typeof vaultAddress === 'string' && isValidAddress(vaultAddress);
+  if (vaultAddress !== undefined && !live) {
+    return res.status(400).json({
+      error: 'INVALID_VAULT_ADDRESS',
+      message: 'vaultAddress must be a valid 20-byte hex address.'
+    });
+  }
+  let verifiedAgentKey: `0x${string}` | undefined;
+  if (live) {
+    const verification = await signerService.verifyVaultAddress(
+      vaultAddress.toLowerCase() as `0x${string}`,
+      signerAddress
+    );
+    if (!verification.valid) {
+      return res.status(400).json({
+        error: verification.reasonCode || 'INVALID_LIVE_VAULT',
+        message: verification.reasonDescription || 'The address is not a compatible live Peribolos vault on Arc Testnet.',
+        agentKey: verification.agentKey
+      });
+    }
+    verifiedAgentKey = verification.agentKey;
+  }
+  // Publish the agent only after optional live-vault validation succeeds.
+  db.addAgent(agent);
   const owner = typeof ownerAddress === 'string' && isValidAddress(ownerAddress)
     ? (ownerAddress as `0x${string}`)
     : ('0x0000000000000000000000000000000000000002' as `0x${string}`);
@@ -420,7 +561,7 @@ v1Router.post('/agents', optionalAuthenticateApiKey, validateBody(createAgentSch
       ? (vaultAddress.toLowerCase() as `0x${string}`)
       : ('0x0000000000000000000000000000000000000001' as `0x${string}`),
     ownerAddress: owner,
-    agentSignerAddress: signerAddress,
+    agentSignerAddress: verifiedAgentKey || signerAddress,
     treasuryAddress: owner,
     dailyCapUsdc: 100.0,
     perTxCapUsdc: 25.0,
@@ -442,6 +583,7 @@ v1Router.post('/agents', optionalAuthenticateApiKey, validateBody(createAgentSch
     keyPrefix: rawKey.substring(0, 12),
     keyHash,
     name: `${agent.name} API Key`,
+    role: 'agent',
     status: 'active',
     createdAt: new Date().toISOString()
   };
@@ -461,16 +603,63 @@ v1Router.post('/agents', optionalAuthenticateApiKey, validateBody(createAgentSch
   });
 });
 
-v1Router.get('/vaults', (req: Request, res: Response) => {
-  const wsId = (req.query.workspaceId as string) || 'ws_default';
-  return res.json(db.getVaults(wsId));
+v1Router.get('/vaults', authenticateApiKey, (req: Request, res: Response) => {
+  const wsId = (req as any).workspaceId as string;
+  const agentId = scopedAgentId(req);
+  return res.json(db.getVaults(wsId).filter(vault => !agentId || vault.agentId === agentId));
+});
+
+/** Read authoritative vault authorization and USDC state from Arc Testnet. */
+v1Router.get('/vaults/:id/chain-state', authenticateApiKey, requireOperator, async (req: Request, res: Response) => {
+  const vault = db.getVaultById(req.params.id);
+  if (!vault) return res.status(404).json({ error: 'NOT_FOUND', message: 'Vault not found' });
+  if (vault.workspaceId !== (req as any).workspaceId) {
+    return res.status(403).json({ error: 'FORBIDDEN', message: 'Vault does not belong to this workspace.' });
+  }
+  if (vault.mode !== 'live') {
+    return res.status(400).json({
+      error: 'OFFLINE_VAULT',
+      message: 'This vault has no authoritative Arc contract state until a live vault is attached.'
+    });
+  }
+  if (!isValidAddress(vault.address)) {
+    return res.status(400).json({ error: 'INVALID_VAULT_ADDRESS', message: 'Vault address is not a valid 20-byte address.' });
+  }
+  try {
+    const state = await signerService.readVaultState(vault.address);
+    return res.json({
+      network: 'Arc Testnet',
+      chainId: 5042002,
+      vaultId: vault.id,
+      vaultAddress: vault.address,
+      ownerAddress: state.owner,
+      agentKey: state.agentKey,
+      agentKeyExpiresAt: Number(state.agentExpiry),
+      usdcToken: state.usdcToken,
+      balanceUsdc: state.balanceUsdc,
+      balanceUsdcUnits: state.balanceUsdcUnits.toString(),
+      paused: state.paused,
+      perTxCapUsdc: formatUnits(state.perTxCapUsdcUnits, 6),
+      dailyCapUsdc: formatUnits(state.dailyCapUsdcUnits, 6),
+      epochSpentUsdc: formatUnits(state.epochSpentUsdcUnits, 6),
+      explorerUrl: `https://testnet.arcscan.app/address/${vault.address}`
+    });
+  } catch (err) {
+    return res.status(502).json({
+      error: 'CHAIN_STATE_READ_FAILED',
+      message: err instanceof Error ? err.message.slice(0, 300) : 'Unable to read the vault from Arc Testnet.'
+    });
+  }
 });
 
 /** Update spending rules (product-layer); live chain rule updates remain owner-controlled on contract. */
-v1Router.patch('/vaults/:id', authenticateApiKey, validateBody(updateVaultSchema), (req: Request, res: Response) => {
+v1Router.patch('/vaults/:id', authenticateApiKey, requireOperator, validateBody(updateVaultSchema), async (req: Request, res: Response) => {
   const vault = db.getVaultById(req.params.id);
   if (!vault) {
     return res.status(404).json({ error: 'NOT_FOUND', message: 'Vault not found' });
+  }
+  if (vault.workspaceId !== (req as any).workspaceId) {
+    return res.status(403).json({ error: 'FORBIDDEN', message: 'Vault does not belong to this workspace.' });
   }
 
   const {
@@ -492,8 +681,21 @@ v1Router.patch('/vaults/:id', authenticateApiKey, validateBody(updateVaultSchema
   if (typeof paused === 'boolean') updates.paused = paused;
   if (mode === 'live' || mode === 'offline') updates.mode = mode;
   if (typeof address === 'string' && isValidAddress(address)) {
+    const managedSigner = db.getManagedSignerByAgent(vault.agentId);
+    const verification = await signerService.verifyVaultAddress(
+      address.toLowerCase() as `0x${string}`,
+      managedSigner?.address
+    );
+    if (!verification.valid) {
+      return res.status(400).json({
+        error: verification.reasonCode || 'INVALID_LIVE_VAULT',
+        message: verification.reasonDescription || 'The address is not a compatible live Peribolos vault on Arc Testnet.',
+        agentKey: verification.agentKey
+      });
+    }
     updates.address = address.toLowerCase() as `0x${string}`;
     updates.mode = 'live';
+    updates.agentSignerAddress = verification.agentKey || managedSigner?.address;
   }
   if (typeof ownerAddress === 'string' && isValidAddress(ownerAddress)) {
     updates.ownerAddress = ownerAddress.toLowerCase() as `0x${string}`;
@@ -505,10 +707,13 @@ v1Router.patch('/vaults/:id', authenticateApiKey, validateBody(updateVaultSchema
 });
 
 /** Record a vault funding transfer (native Arc USDC → vault). Does not invent success. */
-v1Router.post('/vaults/:id/fund', authenticateApiKey, validateBody(fundVaultSchema), (req: Request, res: Response) => {
+v1Router.post('/vaults/:id/fund', authenticateApiKey, requireOperator, validateBody(fundVaultSchema), (req: Request, res: Response) => {
   const vault = db.getVaultById(req.params.id);
   if (!vault) {
     return res.status(404).json({ error: 'NOT_FOUND', message: 'Vault not found' });
+  }
+  if (vault.workspaceId !== (req as any).workspaceId) {
+    return res.status(403).json({ error: 'FORBIDDEN', message: 'Vault does not belong to this workspace.' });
   }
   const { amountUsdc, txHash, fromAddress } = req.body;
   if (vault.mode !== 'live') {
@@ -541,17 +746,18 @@ v1Router.post('/vaults/:id/fund', authenticateApiKey, validateBody(fundVaultSche
   });
 });
 
-v1Router.get('/payees', (req: Request, res: Response) => {
-  const wsId = (req.query.workspaceId as string) || 'ws_default';
+v1Router.get('/payees', authenticateApiKey, (req: Request, res: Response) => {
+  const wsId = (req as any).workspaceId as string;
   return res.json(db.getPayees(wsId));
 });
 
-v1Router.post('/payees', optionalAuthenticateApiKey, validateBody(createPayeeSchema), (req: Request, res: Response) => {
-  const { name, address, category, description, allowedActionType, defaultLimitUsdc, workspaceId } = req.body;
+v1Router.post('/payees', authenticateApiKey, requireOperator, validateBody(createPayeeSchema), (req: Request, res: Response) => {
+  const { name, address, category, description, allowedActionType, defaultLimitUsdc } = req.body;
+  const workspaceId = (req as any).workspaceId as string;
 
   const payee = {
     id: `pay_${crypto.randomBytes(8).toString('hex')}`,
-    workspaceId: workspaceId || 'ws_default',
+    workspaceId,
     name,
     address: address.toLowerCase() as `0x${string}`,
     category: category || 'api',
@@ -565,43 +771,70 @@ v1Router.post('/payees', optionalAuthenticateApiKey, validateBody(createPayeeSch
   return res.status(201).json(payee);
 });
 
-v1Router.get('/api-keys', (req: Request, res: Response) => {
-  const wsId = (req.query.workspaceId as string) || 'ws_default';
+v1Router.get('/api-keys', authenticateApiKey, requireOperator, (req: Request, res: Response) => {
+  const wsId = (req as any).workspaceId as string;
   const keys = db.getApiKeys(wsId);
   return res.json(keys.map(({ keyHash, ...rest }) => rest));
 });
 
-v1Router.post('/api-keys', authenticateApiKey, (req: Request, res: Response) => {
-  const { agentId, name, workspaceId } = req.body;
-  const wsId = workspaceId || 'ws_default';
+v1Router.post('/api-keys', authenticateApiKey, requireOperator, (req: Request, res: Response) => {
+  const { agentId, name, role } = req.body;
+  const wsId = (req as any).workspaceId as string;
+  const targetAgentId = agentId || (req as any).agentId;
+  const targetAgent = db.getAgents(wsId).find(a => a.id === targetAgentId);
+  if (!targetAgent) {
+    return res.status(403).json({ error: 'FORBIDDEN', message: 'Agent does not belong to this workspace.' });
+  }
   const rawKey = `pb_live_${crypto.randomBytes(24).toString('hex')}`;
   const keyHash = crypto.createHash('sha256').update(rawKey).digest('hex');
 
   const apiKeyRecord: ApiKeyRecord = {
     id: `key_${crypto.randomBytes(8).toString('hex')}`,
     workspaceId: wsId,
-    agentId: agentId || 'ag_demo',
+    agentId: targetAgentId,
     keyPrefix: rawKey.substring(0, 12),
     keyHash,
     name: name || 'Agent API Key',
+    role: role === 'operator' ? 'operator' : 'agent',
     status: 'active',
     createdAt: new Date().toISOString()
   };
   db.addApiKey(apiKeyRecord);
 
   return res.status(201).json({
-    apiKeyRecord: { id: apiKeyRecord.id, name: apiKeyRecord.name, keyPrefix: apiKeyRecord.keyPrefix },
+    apiKeyRecord: { id: apiKeyRecord.id, name: apiKeyRecord.name, keyPrefix: apiKeyRecord.keyPrefix, role: apiKeyRecord.role },
     rawApiKey: rawKey
   });
 });
 
-v1Router.post('/signers/rotate', authenticateApiKey, (req: Request, res: Response) => {
+v1Router.post('/signers/rotate', authenticateApiKey, requireOperator, async (req: Request, res: Response) => {
   const { vaultId, agentId } = req.body;
   if (!vaultId || !agentId) {
     return res.status(400).json({ error: 'INVALID_PAYLOAD', message: 'vaultId and agentId are required' });
   }
+  const vault = assertVaultInWorkspace(vaultId, (req as any).workspaceId, res);
+  if (!vault) return;
+  if (vault.agentId !== agentId) {
+    return res.status(403).json({ error: 'FORBIDDEN', message: 'Vault is not owned by this agent.' });
+  }
+  if (vault.mode === 'live') {
+    return res.status(409).json({
+      error: 'LIVE_VAULT_ROTATION_REQUIRES_OWNER',
+      message:
+        'This vault is live on Arc Testnet. Rotate its agentKey from the owner wallet first; managed signer rotation is disabled until an owner-authorized on-chain rotation flow is completed.'
+    });
+  }
 
-  const { newAddress, newRecord } = signerService.rotateSigner(vaultId, agentId);
+  let newAddress: `0x${string}`;
+  let newRecord: import('../db/store.js').ManagedSignerRecord;
+  try {
+    ({ newAddress, newRecord } = await signerService.rotateSigner(vaultId, agentId));
+  } catch (err) {
+    return res.status(503).json({
+      error: 'SIGNER_ROTATION_FAILED',
+      message: err instanceof Error ? err.message : 'Unable to rotate the agent signer.'
+    });
+  }
   db.updateVault(vaultId, { agentSignerAddress: newAddress });
 
   // Response must never include private key material
@@ -613,11 +846,114 @@ v1Router.post('/signers/rotate', authenticateApiKey, (req: Request, res: Respons
   });
 });
 
-v1Router.post('/signers/pause', authenticateApiKey, (req: Request, res: Response) => {
-  const { vaultId, paused } = req.body;
-  const vault = vaultId ? db.getVaultById(vaultId) : db.getVaults()[0];
+/**
+ * Prepare a live-vault rotation without changing the active signer. The owner
+ * must call rotateAgentKey on-chain, then confirm it through the endpoint below.
+ */
+v1Router.post('/signers/rotate/prepare', authenticateApiKey, requireOperator, async (req: Request, res: Response) => {
+  const { vaultId, agentId } = req.body;
+  if (!vaultId || !agentId) {
+    return res.status(400).json({ error: 'INVALID_PAYLOAD', message: 'vaultId and agentId are required' });
+  }
+  const vault = assertVaultInWorkspace(vaultId, (req as any).workspaceId, res);
+  if (!vault) return;
+  if (vault.agentId !== agentId) {
+    return res.status(403).json({ error: 'FORBIDDEN', message: 'Vault is not owned by this agent.' });
+  }
+  if (vault.mode !== 'live') {
+    return res.status(400).json({
+      error: 'LIVE_VAULT_REQUIRED',
+      message: 'Two-phase owner rotation is only required for live Arc vaults; use the regular rotation endpoint for offline signers.'
+    });
+  }
 
-  if (!vault) {
+  try {
+    const { address, record } = await signerService.provisionSigner(vault.id, agentId, 'pending');
+    return res.status(201).json({
+      vaultId: vault.id,
+      agentId,
+      newSignerAddress: address,
+      signerRecordId: record.id,
+      status: 'pending_owner_confirmation',
+      message: 'Submit rotateAgentKey(newSignerAddress, newExpiry) from the vault owner wallet, then confirm the transaction here.'
+    });
+  } catch (err) {
+    return res.status(503).json({
+      error: 'SIGNER_ROTATION_PREPARE_FAILED',
+      message: err instanceof Error ? err.message : 'Unable to provision a pending signer.'
+    });
+  }
+});
+
+/** Promote a prepared signer only after Arc reports it as the vault agentKey. */
+v1Router.post('/signers/rotate/confirm', authenticateApiKey, requireOperator, async (req: Request, res: Response) => {
+  const { vaultId, agentId, newSignerAddress, txHash } = req.body;
+  if (!vaultId || !agentId || !isValidAddress(newSignerAddress)) {
+    return res.status(400).json({ error: 'INVALID_PAYLOAD', message: 'vaultId, agentId, and a valid newSignerAddress are required' });
+  }
+  const vault = assertVaultInWorkspace(vaultId, (req as any).workspaceId, res);
+  if (!vault) return;
+  if (vault.agentId !== agentId) {
+    return res.status(403).json({ error: 'FORBIDDEN', message: 'Vault is not owned by this agent.' });
+  }
+  if (vault.mode !== 'live') {
+    return res.status(400).json({ error: 'LIVE_VAULT_REQUIRED', message: 'Signer confirmation requires a live Arc vault.' });
+  }
+
+  const normalizedAddress = newSignerAddress.toLowerCase() as `0x${string}`;
+  const pending = db.getManagedSignerByAddress(normalizedAddress, 'pending');
+  if (!pending || pending.agentId !== agentId || pending.vaultId !== vault.id) {
+    return res.status(404).json({ error: 'PENDING_SIGNER_NOT_FOUND', message: 'No pending signer exists for this agent and vault.' });
+  }
+
+  try {
+    const authorization = await signerService.readVaultAuthorization(vault.address);
+    if (authorization.agentKey.toLowerCase() !== normalizedAddress) {
+      return res.status(409).json({
+        error: 'OWNER_ROTATION_NOT_CONFIRMED',
+        message: `Arc still reports agentKey ${authorization.agentKey}; submit rotateAgentKey from the vault owner wallet first.`
+      });
+    }
+    const promoted = db.promoteManagedSigner(agentId, normalizedAddress);
+    if (!promoted) {
+      return res.status(409).json({ error: 'SIGNER_PROMOTION_FAILED', message: 'The pending signer could not be promoted.' });
+    }
+    db.updateVault(vault.id, {
+      agentSignerAddress: normalizedAddress,
+      agentKeyExpiresAt: Number(authorization.agentExpiry)
+    });
+    if (typeof txHash === 'string' && /^0x[0-9a-fA-F]{64}$/.test(txHash)) {
+      db.addChainEvent({
+        id: `evt_rotate_${crypto.randomBytes(6).toString('hex')}`,
+        vaultAddress: vault.address,
+        eventType: 'AgentKeyRotated',
+        agentKey: normalizedAddress,
+        txHash: txHash as `0x${string}`,
+        blockNumber: 0,
+        timestamp: new Date().toISOString()
+      });
+    }
+    return res.json({
+      vaultId: vault.id,
+      agentId,
+      activeSignerAddress: promoted.address,
+      agentKeyExpiresAt: Number(authorization.agentExpiry),
+      status: 'active'
+    });
+  } catch (err) {
+    return res.status(502).json({
+      error: 'OWNER_ROTATION_VERIFY_FAILED',
+      message: err instanceof Error ? err.message : 'Unable to verify the vault authorization on Arc Testnet.'
+    });
+  }
+});
+
+v1Router.post('/signers/pause', authenticateApiKey, requireOperator, (req: Request, res: Response) => {
+  const { vaultId, paused } = req.body;
+  const workspaceId = (req as any).workspaceId as string;
+  const vault = vaultId ? db.getVaultById(vaultId) : db.getVaults(workspaceId)[0];
+
+  if (!vault || vault.workspaceId !== workspaceId) {
     return res.status(404).json({ error: 'NOT_FOUND', message: 'Vault not found' });
   }
 
@@ -631,10 +967,21 @@ v1Router.post('/signers/pause', authenticateApiKey, (req: Request, res: Response
   });
 });
 
-v1Router.post('/signers/revoke', authenticateApiKey, (req: Request, res: Response) => {
+v1Router.post('/signers/revoke', authenticateApiKey, requireOperator, (req: Request, res: Response) => {
   const { agentId, vaultId } = req.body;
   if (!agentId) {
     return res.status(400).json({ error: 'INVALID_PAYLOAD', message: 'agentId is required' });
+  }
+  const workspaceId = (req as any).workspaceId as string;
+  if (!db.getAgents(workspaceId).find(a => a.id === agentId)) {
+    return res.status(403).json({ error: 'FORBIDDEN', message: 'Agent does not belong to this workspace.' });
+  }
+  if (vaultId) {
+    const vault = assertVaultInWorkspace(vaultId, workspaceId, res);
+    if (!vault) return;
+    if (vault.agentId !== agentId) {
+      return res.status(403).json({ error: 'FORBIDDEN', message: 'Vault is not owned by this agent.' });
+    }
   }
   const ok = signerService.revokeSigner(agentId);
   if (vaultId) {

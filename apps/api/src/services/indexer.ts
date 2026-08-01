@@ -1,6 +1,6 @@
-import { createPublicClient, http } from 'viem';
+import { createPublicClient, decodeEventLog, http, parseAbi } from 'viem';
 import { arcTestnet } from '@peribolos/core';
-import { db, ChainEventRecord } from '../db/store.js';
+import { db } from '../db/store.js';
 
 const REASON_CODES: Record<number, string> = {
   0: 'NONE',
@@ -13,6 +13,19 @@ const REASON_CODES: Record<number, string> = {
   7: 'INSUFFICIENT_BALANCE',
   8: 'TRANSFER_FAILED'
 };
+
+const VAULT_EVENT_ABI = parseAbi([
+  'event PaymentExecuted(address indexed to, uint256 amount, uint8 indexed actionType, uint256 epochSpent)',
+  'event PaymentBlocked(address indexed to, uint256 amount, uint8 indexed actionType, uint8 indexed reason)',
+  'event RulesUpdated(uint128 perTxCap, uint128 dailyCap, uint128 floatAmount, uint256 allowedActions)',
+  'event AgentKeyRotated(address indexed newAgentKey, uint64 newExpiry)',
+  'event Swept(address indexed treasury, uint256 amount)',
+  'event Withdrawn(address indexed to, uint256 amount)'
+]);
+
+function usdcUnitsToNumber(amount: bigint): number {
+  return Number(amount) / 1_000_000;
+}
 
 export class EventIndexerService {
   private publicClient;
@@ -34,7 +47,6 @@ export class EventIndexerService {
     this.timer = setInterval(() => {
       this.poll().catch(err => console.error('[Indexer] Poll error:', err));
     }, intervalMs);
-    // Initial run
     this.poll().catch(err => console.error('[Indexer] Poll error:', err));
   }
 
@@ -47,15 +59,14 @@ export class EventIndexerService {
   }
 
   private async poll(): Promise<void> {
-    const vaults = db.getVaults();
+    const vaults = db.getVaults().filter(v => v.mode === 'live' && /^0x[0-9a-fA-F]{40}$/.test(v.address));
     if (vaults.length === 0) return;
+
+    const currentBlock = await this.publicClient.getBlockNumber();
+    const fromBlock = currentBlock > 5_000n ? currentBlock - 5_000n : 0n;
 
     for (const vault of vaults) {
       try {
-        const currentBlock = await this.publicClient.getBlockNumber();
-        const fromBlock = currentBlock > 100n ? currentBlock - 100n : 0n;
-
-        // Fetch logs for this vault address
         const logs = await this.publicClient.getLogs({
           address: vault.address,
           fromBlock,
@@ -63,22 +74,92 @@ export class EventIndexerService {
         });
 
         for (const log of logs) {
-          // Normalize event
           const txHash = log.transactionHash;
           const blockNumber = Number(log.blockNumber);
+          const id = `evt_${txHash}_${log.logIndex}`;
+          let decoded: { eventName: string; args: any };
+          try {
+            decoded = decodeEventLog({
+              abi: VAULT_EVENT_ABI,
+              data: log.data,
+              topics: log.topics
+            }) as { eventName: string; args: any };
+          } catch {
+            continue;
+          }
 
-          // Record placeholder event if log found
-          db.addChainEvent({
-            id: `evt_${log.transactionHash.slice(0, 10)}_${log.logIndex}`,
-            vaultAddress: vault.address,
-            eventType: 'PaymentExecuted',
-            txHash,
-            blockNumber,
-            timestamp: new Date().toISOString()
-          });
+          if (decoded.eventName === 'PaymentExecuted') {
+            db.addChainEvent({
+              id,
+              vaultAddress: vault.address,
+              eventType: 'PaymentExecuted',
+              recipient: decoded.args.to,
+              amountUsdc: usdcUnitsToNumber(decoded.args.amount),
+              actionType: Number(decoded.args.actionType),
+              txHash,
+              blockNumber,
+              timestamp: new Date().toISOString()
+            });
+          } else if (decoded.eventName === 'PaymentBlocked') {
+            const reasonOrdinal = Number(decoded.args.reason);
+            db.addChainEvent({
+              id,
+              vaultAddress: vault.address,
+              eventType: 'PaymentBlocked',
+              recipient: decoded.args.to,
+              amountUsdc: usdcUnitsToNumber(decoded.args.amount),
+              actionType: Number(decoded.args.actionType),
+              reasonOrdinal,
+              reasonCode: REASON_CODES[reasonOrdinal] || 'PAYMENT_BLOCKED',
+              txHash,
+              blockNumber,
+              timestamp: new Date().toISOString()
+            });
+          } else if (decoded.eventName === 'RulesUpdated') {
+            db.addChainEvent({
+              id,
+              vaultAddress: vault.address,
+              eventType: 'RulesUpdated',
+              txHash,
+              blockNumber,
+              timestamp: new Date().toISOString()
+            });
+          } else if (decoded.eventName === 'AgentKeyRotated') {
+            db.addChainEvent({
+              id,
+              vaultAddress: vault.address,
+              eventType: 'AgentKeyRotated',
+              agentKey: decoded.args.newAgentKey,
+              txHash,
+              blockNumber,
+              timestamp: new Date().toISOString()
+            });
+          } else if (decoded.eventName === 'Swept') {
+            db.addChainEvent({
+              id,
+              vaultAddress: vault.address,
+              eventType: 'Swept',
+              recipient: decoded.args.treasury,
+              amountUsdc: usdcUnitsToNumber(decoded.args.amount),
+              txHash,
+              blockNumber,
+              timestamp: new Date().toISOString()
+            });
+          } else if (decoded.eventName === 'Withdrawn') {
+            db.addChainEvent({
+              id,
+              vaultAddress: vault.address,
+              eventType: 'Withdrawn',
+              recipient: decoded.args.to,
+              amountUsdc: usdcUnitsToNumber(decoded.args.amount),
+              txHash,
+              blockNumber,
+              timestamp: new Date().toISOString()
+            });
+          }
         }
       } catch (err) {
-        // Silently swallow network RPC polling glitches
+        console.warn('[Indexer] Vault poll skipped:', vault.address, err instanceof Error ? err.message : err);
       }
     }
   }

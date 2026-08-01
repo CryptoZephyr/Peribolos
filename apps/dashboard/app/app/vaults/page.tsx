@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { Address } from "viem";
 import { fetchApi } from "@/lib/api-client";
 import { useToast } from "@/app/components/Toast";
@@ -25,8 +25,23 @@ type Vault = {
   agentSignerAddress?: string;
 };
 
+type ChainState = {
+  vaultId: string;
+  balanceUsdc: string;
+  balanceUsdcUnits: string;
+  agentKey: string;
+  agentKeyExpiresAt: number;
+  ownerAddress: string;
+  paused: boolean;
+  epochSpentUsdc: string;
+  perTxCapUsdc: string;
+  dailyCapUsdc: string;
+  explorerUrl: string;
+};
+
 export default function VaultsPage() {
   const [vaults, setVaults] = useState<Vault[]>([]);
+  const [chainStates, setChainStates] = useState<Record<string, ChainState>>({});
   const [loading, setLoading] = useState(true);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [dailyCap, setDailyCap] = useState("100");
@@ -38,6 +53,10 @@ export default function VaultsPage() {
   const [linkVaultId, setLinkVaultId] = useState<string | null>(null);
 
   const toast = useToast();
+  const selectedVault = useMemo(
+    () => vaults.find((vault) => vault.id === linkVaultId) || vaults[0] || null,
+    [linkVaultId, vaults],
+  );
 
   useEffect(() => {
     loadVaults();
@@ -47,6 +66,21 @@ export default function VaultsPage() {
     try {
       const data: Vault[] = await fetchApi("/v1/vaults");
       setVaults(data);
+      const liveStates = await Promise.all(
+        data.filter((vault) => vault.mode === "live").map(async (vault) => {
+          try {
+            const state = await fetchApi<ChainState>(`/v1/vaults/${vault.id}/chain-state`);
+            return [vault.id, state] as const;
+          } catch {
+            return null;
+          }
+        }),
+      );
+      setChainStates((current) => {
+        const next = { ...current };
+        for (const entry of liveStates) if (entry) next[entry[0]] = entry[1];
+        return next;
+      });
       if (data.length > 0 && !linkVaultId) {
         setLinkVaultId(data[0].id);
       }
@@ -107,17 +141,34 @@ export default function VaultsPage() {
     }
   }
 
-  async function handleDomainCreated(vaultAddress: Address) {
-    const targetId = linkVaultId || vaults[0]?.id;
-    if (!targetId) {
+  async function handleDomainCreated(
+    vaultAddress: Address,
+    context: { ownerAddress: Address; agentSignerAddress: Address },
+  ) {
+    const targetVault = selectedVault;
+    if (!targetVault) {
       toast.success("Domain Created", `Address: ${vaultAddress.substring(0, 10)}...`);
       setShowCreateDomain(false);
       return;
     }
+    if (
+      targetVault.agentSignerAddress &&
+      targetVault.agentSignerAddress.toLowerCase() !== context.agentSignerAddress.toLowerCase()
+    ) {
+      toast.error(
+        "Signer Mismatch",
+        "The live vault was created for a different agent signer, so it was not linked to this hosted agent."
+      );
+      return;
+    }
     try {
-      await fetchApi(`/v1/vaults/${targetId}`, {
+      await fetchApi(`/v1/vaults/${targetVault.id}`, {
         method: "PATCH",
-        body: JSON.stringify({ address: vaultAddress, mode: "live" }),
+        body: JSON.stringify({
+          address: vaultAddress,
+          mode: "live",
+          ownerAddress: context.ownerAddress,
+        }),
       });
       toast.success("Domain Linked as Live Vault", `Arc Vault Address: ${vaultAddress}`);
       setShowCreateDomain(false);
@@ -157,12 +208,12 @@ export default function VaultsPage() {
               <li>Vault is deployed & funded on Arc Testnet; linked dynamically to your agent.</li>
             </ol>
             {vaults.length > 0 && (
-              <label className="block pt-2">
-                Link created domain to product vault:{" "}
+              <label className="block pt-2 space-y-2">
+                <span>Link created domain to product vault: </span>
                 <select
                   value={linkVaultId || ""}
                   onChange={(e) => setLinkVaultId(e.target.value)}
-                  className="ml-1 rounded border border-line bg-surface px-2 py-1 font-mono text-[11px] text-text"
+                  className="rounded border border-line bg-surface px-2 py-1 font-mono text-[11px] text-text"
                 >
                   {vaults.map((v) => (
                     <option key={v.id} value={v.id}>
@@ -170,10 +221,18 @@ export default function VaultsPage() {
                     </option>
                   ))}
                 </select>
+                {selectedVault?.agentSignerAddress && (
+                  <span className="block font-mono text-[11px] text-text">
+                    Agent key for this vault: {selectedVault.agentSignerAddress}
+                  </span>
+                )}
               </label>
             )}
           </div>
-          <CreateDomainWizard onCreated={handleDomainCreated} />
+          <CreateDomainWizard
+            initialAgentAddress={selectedVault?.agentSignerAddress as Address | undefined}
+            onCreated={handleDomainCreated}
+          />
         </div>
       )}
 
@@ -192,6 +251,9 @@ export default function VaultsPage() {
       ) : (
         <div className="space-y-6">
           {vaults.map((vault) => (
+            (() => {
+              const chainState = chainStates[vault.id];
+              return (
             <div
               key={vault.id}
               className="rounded-xl border border-line bg-surface-raised p-6 space-y-6 shadow-sm hover:border-accent/30 transition-colors"
@@ -261,7 +323,22 @@ export default function VaultsPage() {
                     0b{vault.allowedActionsBitmap.toString(2)} ({vault.allowedActionsBitmap})
                   </p>
                 </div>
+                {vault.mode === "live" && (
+                  <div className="rounded-lg border border-emerald-500/25 bg-emerald-500/5 p-4">
+                    <span className="text-xs text-text-muted">Authoritative Arc Balance</span>
+                    <p className="mt-1 text-lg font-bold text-emerald-300 font-mono">
+                      {chainState ? `${chainState.balanceUsdc} USDC` : "Reading Arc…"}
+                    </p>
+                    <span className="text-[10px] text-text-faint">On-chain ERC-20 balance</span>
+                  </div>
+                )}
               </div>
+
+              {vault.mode === "live" && chainState && chainState.agentKey.toLowerCase() !== (vault.agentSignerAddress || "").toLowerCase() && (
+                <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-200">
+                  Arc reports a different <code className="font-mono">agentKey</code> than the workspace record. Payments remain blocked until the owner rotation is confirmed.
+                </div>
+              )}
 
               {editingId === vault.id && (
                 <div className="rounded-lg border border-accent/30 bg-accent/5 p-4 space-y-3 animate-in fade-in duration-200">
@@ -342,7 +419,7 @@ export default function VaultsPage() {
                   vaultAddress={vault.address as Address}
                   owner={vault.ownerAddress as Address}
                   paused={vault.paused}
-                  balance={0n}
+                  balance={chainState ? BigInt(chainState.balanceUsdcUnits) : 0n}
                   onSettled={loadVaults}
                 />
               )}
@@ -353,6 +430,8 @@ export default function VaultsPage() {
                 </div>
               )}
             </div>
+              );
+            })()
           ))}
         </div>
       )}

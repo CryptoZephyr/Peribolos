@@ -24,7 +24,7 @@ Peribolos provides on-chain spending controls and a payment API for AI agents. S
 
 | Component | Details |
 |---|---|
-| **Web Control Room** | Next.js 15 app for agent provisioning, vault configuration, payee allowlists, daily budgets, and API key generation. |
+| **Web Control Room** | Next.js 16 app for agent provisioning, vault configuration, payee allowlists, daily budgets, and API key generation. |
 | **Managed Signer** | Server-side AES-256-GCM key isolation. Agents use API keys (`pb_live_...`) instead of raw private keys. |
 | **Payment API** | Express 4.21 backend (`POST /v1/payments`) with Bearer token authentication, SHA-256 key hashing, idempotency, and policy checks. |
 | **On-Chain Enforcement** | Arc L1 smart contracts (`PeribolosVault.sol`) enforce per-transaction caps, daily velocity limits, action bitmasks, and payee allowlists. |
@@ -63,8 +63,8 @@ flowchart TD
 | **RPC Endpoint** | `https://rpc.testnet.arc.network` |
 | **Block Explorer** | [testnet.arcscan.app](https://testnet.arcscan.app) |
 | **Native USDC Asset** | `0x3600000000000000000000000000000000000000` (6 decimals, native gas asset) |
-| **Peribolos Factory** | [`0xda3751cd08435D8b5137DD11A9a7797c214cfC4a`](https://testnet.arcscan.app/address/0xda3751cd08435D8b5137DD11A9a7797c214cfC4a) |
-| **Sample Vault** | [`0x62D5487d6523fc4D34692e1DbF8EBC01F39BbC7B`](https://testnet.arcscan.app/address/0x62D5487d6523fc4D34692e1DbF8EBC01F39BbC7B) |
+| **Peribolos Factory** | [`0x84B6a05B1d71D5947Adf1438c6FFe8Eb66AdA31E`](https://testnet.arcscan.app/address/0x84b6a05b1d71d5947adf1438c6ffe8eb66ada31e) |
+| **Sample Vault** | [`0xac5d542EdCB15972570685B2Fdb87be71d1378a1`](https://testnet.arcscan.app/address/0xac5d542edcb15972570685b2fdb87be71d1378a1) |
 | **Hosted Backend API** | `https://peribolos-api.onrender.com` |
 
 ---
@@ -99,11 +99,23 @@ npm run dev:stack
 
 ## Workflow Guide
 
-1. **Provision Agent**: Open **Agents** in the dashboard and click **Provision New Agent**. This deploys an on-chain vault, sets up a managed signer, registers an ERC-8004 identity NFT, and generates an API key (`pb_live_...`).
-2. **Configure Payees**: Add vendor names and EVM target addresses under **Payees**.
-3. **Set Budget Rules**: Configure daily spending caps, per-transaction limits, and allowed action types under **Vaults**.
-4. **Execute Payments**: Pass the API key to your agent to call `POST /v1/payments`.
-5. **Run Security Simulations**: Open **Simulations** to test live prompt injection payloads against vault rules.
+1. **Create an agent**: Open **Agents** and click **Provision New Agent**. This creates the agent record, provisions a Circle Developer-Controlled Wallet signer, creates an offline vault placeholder, and returns an agent payment key (`pb_live_...`).
+2. **Deploy the live vault**: Open **Vaults**, connect the owner wallet or passkey on Arc Testnet, paste the managed signer address, configure the allowlist/caps, and submit the owner deployment transaction. The API will only accept the resulting address after verifying Arc bytecode and the vault's on-chain `agentKey`.
+3. **Configure payees and policy**: Add vendor addresses under **Payees**, then review daily caps, per-transaction limits, and action types under **Vaults**. The contract is the final authority.
+4. **Fund and verify**: Fund the vault with Arc-native USDC. The vault page reads the authoritative ERC-20 balance from Arc; recorded transaction notes are not treated as proof of funding.
+5. **Execute payments**: Pass the agent payment key to your runtime and call `POST /v1/payments`. Agents can request `vault.pay`; only the on-chain vault can authorize and transfer USDC.
+6. **Run security simulations**: Open **Simulations** to test prompt-injection payloads against the same policy preflight used by the payment API.
+
+### Workspace keys and roles
+
+Peribolos separates operator control from agent execution:
+
+- **Agent keys** are payment credentials for runtimes. They can submit payment requests but cannot create agents, change vault configuration, rotate signers, manage payees, or issue keys.
+- **Operator keys** are workspace-management credentials for startup operators and Web3 operations teams. They can manage agents, vaults, payees, signers, and workspace keys.
+
+Create and review both key types under **API Keys**. Never place an operator key in an agent environment.
+
+For a live vault, signer rotation is two-phase: an operator prepares a pending signer, the vault owner authorizes `rotateAgentKey` on Arc, and the API confirms the new on-chain key before activating it.
 
 ---
 
@@ -128,6 +140,8 @@ curl -X POST https://peribolos-api.onrender.com/v1/payments \
 ```
 
 #### Successful Execution (`200 OK`)
+
+`EXECUTED` is returned only after a live vault transaction is mined and a `PaymentExecuted` event is observed. Offline vaults return `FAILED` with `OFFLINE_VAULT`; they never fabricate transaction hashes.
 
 ```json
 {

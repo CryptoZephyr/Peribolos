@@ -1,9 +1,12 @@
 import express, { Request, Response, NextFunction } from 'express';
+import dotenv from 'dotenv';
+import { fileURLToPath } from 'node:url';
 import cors from 'cors';
 import rateLimit from 'express-rate-limit';
 import { v1Router } from './routes/v1.js';
 import { eventIndexer } from './services/indexer.js';
-import { db } from './db/store.js';
+
+dotenv.config({ path: fileURLToPath(new URL('../.env', import.meta.url)) });
 
 const app = express();
 const PORT = process.env.PORT || 3400;
@@ -17,7 +20,9 @@ app.use(cors({
   origin: process.env.NODE_ENV === 'production'
     ? allowedOrigins
     : true, // Allow all in dev for convenience
-  credentials: true,
+  credentials: process.env.NODE_ENV === 'production'
+    ? !allowedOrigins.includes('*')
+    : true,
   methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
 }));
@@ -71,29 +76,13 @@ if (!isTestRuntime) {
   eventIndexer.start();
 }
 
-// Ensure demo API key is seeded for instant testing
-const demoKeyRaw = 'pb_live_demo1234567890abcdef1234567890abcdef';
-const crypto = await import('node:crypto');
-const demoKeyHash = crypto.createHash('sha256').update(demoKeyRaw).digest('hex');
-
-if (!db.getApiKeyByHash(demoKeyHash)) {
-  db.addApiKey({
-    id: 'key_demo',
-    workspaceId: 'ws_default',
-    agentId: 'ag_demo',
-    keyPrefix: demoKeyRaw.substring(0, 12),
-    keyHash: demoKeyHash,
-    name: 'Demo Agent API Key',
-    status: 'active',
-    createdAt: new Date().toISOString()
-  });
-}
-
 let server: any;
 if (process.env.NODE_ENV !== 'test' && (!process.argv[1] || process.argv[1].endsWith('server.ts') || process.argv[1].endsWith('server.js'))) {
   server = app.listen(PORT, () => {
-    console.log(`🚀 Peribolos V2 Backend API listening on http://localhost:${PORT}`);
-    console.log(`🔑 Demo API Key for testing: ${demoKeyRaw}`);
+    console.log(`Peribolos V2 Backend API listening on http://localhost:${PORT}`);
+    if (process.env.NODE_ENV !== 'production' && process.env.PERIBOLOS_SEED_DEMO !== '0') {
+      console.log('Demo API key seeded for local development only.');
+    }
   });
 }
 

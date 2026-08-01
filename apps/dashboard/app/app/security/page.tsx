@@ -28,7 +28,7 @@ export default function SecurityPage() {
           <h2 className="text-sm font-bold text-text uppercase tracking-wider">Managed Signer Isolation</h2>
           <ul className="space-y-2 list-disc list-inside">
             <li><strong>Encrypted Private Keys:</strong> Managed agent keys are stored AES-256-GCM encrypted server-side and never exposed to client-side frontend code or static build assets.</li>
-            <li><strong>Owner Rotation:</strong> The workspace owner retains full key rotation and revocation power at all times via the Agents dashboard (no terminal required).</li>
+            <li><strong>Owner Rotation:</strong> Offline managed signers can be rotated from the Agents dashboard. Live vault signer rotation requires the owner wallet to authorize the vault&apos;s on-chain <code className="text-accent font-mono">rotateAgentKey</code> call first.</li>
             <li><strong>Vault Scope:</strong> Agent signers can only execute approved <code className="text-accent font-mono">vault.pay</code> actions; they cannot withdraw funds or change vault rules.</li>
             <li><strong>Honest outcomes:</strong> The hosted payment API never fabricates EXECUTED tx hashes. Offline vaults return FAILED / OFFLINE_VAULT after a successful policy preflight.</li>
           </ul>

@@ -653,7 +653,7 @@ contract PeribolosVaultTest is Test {
         assertEq(vault.feeBps(), 0);
     }
 
-    function test_Pay_WithProtocolFee_SplitsNetAndFee() public {
+    function test_Pay_WithProtocolFee_PaysNetAndAccruesFee() public {
         address feeSink = makeAddr("feeSink");
         vm.prank(ownerAddr);
         vault.setProtocolFee(1000, feeSink); // 10%
@@ -671,9 +671,29 @@ contract PeribolosVaultTest is Test {
 
         assertTrue(_pay(recipient1, amount, 0));
         assertEq(usdc.balanceOf(recipient1), recipientBefore + net);
-        assertEq(usdc.balanceOf(feeSink), fee);
-        assertEq(usdc.balanceOf(address(vault)), vaultBefore - amount);
+        assertEq(usdc.balanceOf(feeSink), 0);
+        assertEq(vault.accruedProtocolFees(), fee);
+        assertEq(usdc.balanceOf(address(vault)), vaultBefore - net);
         assertEq(vault.epochSpent(), amount);
+
+        vault.claimProtocolFees();
+        assertEq(usdc.balanceOf(feeSink), fee);
+        assertEq(vault.accruedProtocolFees(), 0);
+        assertEq(usdc.balanceOf(address(vault)), vaultBefore - amount);
+    }
+
+    function test_Pay_WithProtocolFee_RecipientFailureDoesNotMoveFee() public {
+        address feeSink = makeAddr("feeSink");
+        vm.prank(ownerAddr);
+        vault.setProtocolFee(1000, feeSink); // 10%
+
+        usdc.setBlocked(recipient1, true);
+        uint256 vaultBefore = usdc.balanceOf(address(vault));
+
+        assertFalse(_pay(recipient1, 10e6, 0));
+        assertEq(usdc.balanceOf(address(vault)), vaultBefore);
+        assertEq(usdc.balanceOf(feeSink), 0);
+        assertEq(vault.accruedProtocolFees(), 0);
     }
 
     function test_SetProtocolFee_RevertsNotOwner() public {

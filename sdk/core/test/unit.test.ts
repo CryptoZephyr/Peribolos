@@ -77,7 +77,7 @@ describe("Arc testnet constants (docs-aligned)", () => {
     assert.equal(USDC_ADDRESS.toLowerCase(), "0x3600000000000000000000000000000000000000");
     assert.equal(
       PERIBOLOS_FACTORY_ADDRESS.toLowerCase(),
-      "0xda3751cd08435d8b5137dd11a9a7797c214cfc4a",
+      "0x84b6a05b1d71d5947adf1438c6ffe8eb66ada31e",
     );
   });
 });

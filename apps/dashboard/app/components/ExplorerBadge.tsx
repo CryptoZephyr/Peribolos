@@ -1,6 +1,6 @@
 "use client";
 
-import React, { memo, useState } from "react";
+import { memo, useState } from "react";
 
 export const ExplorerBadge = memo(function ExplorerBadge({
   type,

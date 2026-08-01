@@ -17,14 +17,27 @@ services:
         value: production
       - key: ARC_RPC_URL
         value: https://rpc.testnet.arc.network
+      # Required for production Circle Developer-Controlled Wallet provisioning.
+      - key: CIRCLE_API_KEY
+        sync: false
+      - key: ENTITY_SECRET
+        sync: false
+      - key: CIRCLE_WALLET_SET_ID
+        sync: false
       - key: SIGNER_ENCRYPTION_KEY
         generateValue: true
       - key: CORS_ORIGIN
-        value: "*"
+        sync: false
+      - key: PERIBOLOS_DB_FILE
+        value: /app/data/db.json
+      - key: PERIBOLOS_SEED_DEMO
+        value: "0"
+      # Optional: set a long random pb_live_... value once to bootstrap the first workspace key.
+      - key: PERIBOLOS_BOOTSTRAP_API_KEY
+        sync: false
     # Persistent disks require a paid plan on Render (Starter or above).
     # Uncomment below if deploying on a paid instance:
     # disk:
     #   name: peribolos-db-data
-    #   mountPath: /app/apps/api/data
+    #   mountPath: /app/data
     #   sizeGB: 1
-

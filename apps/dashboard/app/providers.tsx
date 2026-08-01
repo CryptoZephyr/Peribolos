@@ -8,6 +8,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { SessionProvider } from "@/app/app/session";
 import { ToastProvider } from "@/app/components/Toast";
 import { arcTransport } from "@/lib/chain";
+import { SupabaseAuthProvider } from "@/app/auth/SupabaseAuthProvider";
 
 export const wagmiConfig = createConfig({
   chains: [arcTestnet],
@@ -36,9 +37,11 @@ export function Providers({ children }: { children: ReactNode }) {
   return (
     <WagmiProvider config={wagmiConfig}>
       <QueryClientProvider client={queryClient}>
-        <SessionProvider>
-          <ToastProvider>{children}</ToastProvider>
-        </SessionProvider>
+        <SupabaseAuthProvider>
+          <SessionProvider>
+            <ToastProvider>{children}</ToastProvider>
+          </SessionProvider>
+        </SupabaseAuthProvider>
       </QueryClientProvider>
     </WagmiProvider>
   );

@@ -27,7 +27,7 @@ export function preflightPolicyCheck(params: {
 
   // 2. Agent Key Expiration Check
   const nowSec = Math.floor(Date.now() / 1000);
-  if (vault.agentKeyExpiresAt > 0 && nowSec >= vault.agentKeyExpiresAt) {
+  if (vault.agentKeyExpiresAt > 0 && nowSec > vault.agentKeyExpiresAt) {
     return {
       allowed: false,
       reasonOrdinal: 5,
@@ -37,7 +37,7 @@ export function preflightPolicyCheck(params: {
   }
 
   // 3. Recipient / Payee Allowlist Check
-  const payee = db.getPayeeByAddress(payeeAddress);
+  const payee = db.getPayeeByAddress(payeeAddress, vault.workspaceId);
   // Check payee registry or allowlist
   if (!payee) {
     return {
@@ -71,10 +71,11 @@ export function preflightPolicyCheck(params: {
   }
 
   // 6. Daily Cap Check
-  // Compute spent amount today (last 24h / epoch)
-  const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+  // Compute spent amount in the same fixed UTC-day epoch as PeribolosVault.
+  const epochStartMs = Math.floor(nowSec / 86_400) * 86_400 * 1000;
+  const epochStart = new Date(epochStartMs).toISOString();
   const recentPayments = db.getPaymentRequests(vault.workspaceId).filter(
-    pr => pr.vaultId === vault.id && pr.status === 'EXECUTED' && pr.createdAt >= oneDayAgo
+    pr => pr.vaultId === vault.id && pr.status === 'EXECUTED' && pr.createdAt >= epochStart
   );
   const spentToday = recentPayments.reduce((acc, pr) => acc + pr.amountUsdc, 0);
 

@@ -1,9 +1,9 @@
 /**
- * Preflight — one command to verify the demo stack is ready.
+ * Preflight — one command to verify the Arc Testnet stack is ready.
  *
  * Checks:
  *  1. Arc RPC (with failover URLs)
- *  2. Demo vault is alive (balance / agentKey)
+ *  2. Configured vault is alive (balance / agentKey)
  *  3. Optional: x402 seller health on :3402
  *
  * Exit 0 = ready for judges. Exit 1 = fix listed issues.
@@ -68,7 +68,7 @@ try {
 }
 
 // --- Vault ---
-console.log("\n2. Demo vault");
+console.log("\n2. Configured live vault");
 const vault = process.env.VAULT_ADDRESS ?? DEMO_VAULT;
 try {
   const [paused, agentKey, balance] = await Promise.all([
@@ -106,14 +106,14 @@ try {
   fail(`Vault read failed: ${e.shortMessage ?? e.message}`);
 }
 
-// --- Env files ---
-console.log("\n3. Env files");
+// --- Runtime config ---
+console.log("\n3. Runtime config");
 const agentEnv = join(root, "apps/demo-agent/.env");
 const dashEnv = join(root, "apps/dashboard/.env.local");
 if (existsSync(agentEnv)) pass("apps/demo-agent/.env present");
-else fail("apps/demo-agent/.env missing (copy .env.example)");
+else fail("apps/demo-agent/.env missing (configure the agent runtime API key)");
 if (existsSync(dashEnv)) pass("apps/dashboard/.env.local present");
-else fail("apps/dashboard/.env.local missing (optional but needed for zero-setup Playground)");
+else console.log("  ! apps/dashboard/.env.local missing (optional for the dashboard)");
 
 // --- Seller ---
 console.log("\n4. x402 demo-seller");
@@ -126,8 +126,8 @@ try {
     pass(`seller healthy at ${healthUrl} (seller=${body.seller ?? "?"})`);
   }
 } catch {
-  fail(
-    `Seller not reachable at ${healthUrl} — run: npm run dev:seller  (or npm run demo:full)`,
+  console.log(
+    `  ! Seller not reachable at ${healthUrl} (optional x402 demo; run npm run dev:seller if needed)`,
   );
 }
 

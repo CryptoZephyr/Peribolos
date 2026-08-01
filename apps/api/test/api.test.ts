@@ -58,6 +58,32 @@ describe('Peribolos V2 API Integration Tests', () => {
     assert.ok(body.service);
   });
 
+  it('GET /v1/setup/status reports signer readiness without secret values', async () => {
+    const res = await fetch(`${baseUrl}/v1/setup/status`, {
+      headers: { Authorization: `Bearer ${DEMO_KEY}` }
+    });
+    assert.strictEqual(res.status, 200);
+    const body = await res.json();
+    assert.strictEqual(body.signer.network.chainId, 5042002);
+    assert.ok(['circle-dcw', 'local-dev'].includes(body.signer.provider));
+    assert.ok(Array.isArray(body.signer.circle.missingEnv));
+    assert.ok(!JSON.stringify(body).includes('pb_live_demo'));
+    assert.ok(!JSON.stringify(body).includes('peribolos-v2-dev-signer-master-secret'));
+  });
+
+  it('GET /v1/signers/status reports active wallet linkage without key material', async () => {
+    const res = await fetch(`${baseUrl}/v1/signers/status`, {
+      headers: { Authorization: `Bearer ${DEMO_KEY}` }
+    });
+    assert.strictEqual(res.status, 200);
+    const body = await res.json();
+    assert.strictEqual(body.chainId, 5042002);
+    assert.ok(Array.isArray(body.agents));
+    assert.ok(body.agents.some((entry: { agentId: string }) => entry.agentId === 'ag_demo'));
+    assert.ok(!JSON.stringify(body).includes('encryptedPrivateKey'));
+    assert.ok(!JSON.stringify(body).includes('walletId'));
+  });
+
   it('POST /v1/payments rejects missing authorization header with 401', async () => {
     const res = await fetch(`${baseUrl}/v1/payments`, {
       method: 'POST',
@@ -79,6 +105,24 @@ describe('Peribolos V2 API Integration Tests', () => {
       body: JSON.stringify({ payeeAddress: ALLOWED_PAYEE, amountUsdc: 1.0 })
     });
     assert.strictEqual(res.status, 401);
+  });
+
+  it('POST /v1/payments rejects amounts below Arc USDC precision', async () => {
+    const res = await fetch(`${baseUrl}/v1/payments`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${DEMO_KEY}`
+      },
+      body: JSON.stringify({
+        payeeAddress: ALLOWED_PAYEE,
+        amountUsdc: 0.0000009,
+        actionType: 1
+      })
+    });
+    assert.strictEqual(res.status, 400);
+    const body = await res.json();
+    assert.match(body.message, /6 decimal places/);
   });
 
   it('POST /v1/payments: allowlisted payee on offline vault is FAILED (not fabricated EXECUTED)', async () => {
@@ -183,7 +227,7 @@ describe('Peribolos V2 API Integration Tests', () => {
   it('POST /v1/simulations: untrusted payee is BLOCKED_BY_POLICY from real preflight (not theater)', async () => {
     const res = await fetch(`${baseUrl}/v1/simulations/prompt-injection`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${DEMO_KEY}` },
       body: JSON.stringify({ scenarioId: 'scen_untrusted_drain' })
     });
     assert.strictEqual(res.status, 200);
@@ -200,7 +244,9 @@ describe('Peribolos V2 API Integration Tests', () => {
   });
 
   it('POST /v1/simulations: scen_action_type_bypass with bitmap 255 does NOT fabricate BLOCKED', async () => {
-    const vaultsRes = await fetch(`${baseUrl}/v1/vaults`);
+    const vaultsRes = await fetch(`${baseUrl}/v1/vaults`, {
+      headers: { Authorization: `Bearer ${DEMO_KEY}` }
+    });
     const vaults = await vaultsRes.json();
     const vault = vaults.find((v: { agentId: string }) => v.agentId === 'ag_demo') || vaults[0];
     // Ensure full bitmap so action type 7 is allowed by preflight
@@ -212,7 +258,7 @@ describe('Peribolos V2 API Integration Tests', () => {
 
     const res = await fetch(`${baseUrl}/v1/simulations/prompt-injection`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${DEMO_KEY}` },
       body: JSON.stringify({ scenarioId: 'scen_action_type_bypass', vaultId: vault.id })
     });
     assert.strictEqual(res.status, 200);
@@ -227,7 +273,9 @@ describe('Peribolos V2 API Integration Tests', () => {
   });
 
   it('POST /v1/simulations: outcome tracks preflight when action bit is cleared', async () => {
-    const vaultsRes = await fetch(`${baseUrl}/v1/vaults`);
+    const vaultsRes = await fetch(`${baseUrl}/v1/vaults`, {
+      headers: { Authorization: `Bearer ${DEMO_KEY}` }
+    });
     const vaults = await vaultsRes.json();
     const vault = vaults.find((v: { agentId: string }) => v.agentId === 'ag_demo') || vaults[0];
     // Clear bit 7 (128) so action type 7 is not allowed: 255 - 128 = 127
@@ -239,7 +287,7 @@ describe('Peribolos V2 API Integration Tests', () => {
 
     const res = await fetch(`${baseUrl}/v1/simulations/prompt-injection`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${DEMO_KEY}` },
       body: JSON.stringify({ scenarioId: 'scen_action_type_bypass', vaultId: vault.id })
     });
     assert.strictEqual(res.status, 200);
@@ -259,7 +307,9 @@ describe('Peribolos V2 API Integration Tests', () => {
   });
 
   it('POST /v1/vaults/:id/fund rejects offline vault and fake-less missing hash', async () => {
-    const vaultsRes = await fetch(`${baseUrl}/v1/vaults`);
+    const vaultsRes = await fetch(`${baseUrl}/v1/vaults`, {
+      headers: { Authorization: `Bearer ${DEMO_KEY}` }
+    });
     const vaults = await vaultsRes.json();
     const vault = vaults.find((v: { mode: string }) => v.mode === 'offline') || vaults[0];
     const bad = await fetch(`${baseUrl}/v1/vaults/${vault.id}/fund`, {
@@ -278,10 +328,19 @@ describe('Peribolos V2 API Integration Tests', () => {
       body: JSON.stringify({ amountUsdc: 5 })
     });
     assert.strictEqual(noHash.status, 400);
+
+    const chainState = await fetch(`${baseUrl}/v1/vaults/${vault.id}/chain-state`, {
+      headers: { Authorization: `Bearer ${DEMO_KEY}` }
+    });
+    assert.strictEqual(chainState.status, 400);
+    const chainStateBody = await chainState.json();
+    assert.strictEqual(chainStateBody.error, 'OFFLINE_VAULT');
   });
 
   it('GET /v1/audit/export returns CSV with audit columns and prior payment rows', async () => {
-    const res = await fetch(`${baseUrl}/v1/audit/export?format=csv`);
+    const res = await fetch(`${baseUrl}/v1/audit/export?format=csv`, {
+      headers: { Authorization: `Bearer ${DEMO_KEY}` }
+    });
     assert.strictEqual(res.status, 200);
     assert.ok(res.headers.get('content-type')?.includes('text/csv'));
     const csv = await res.text();
@@ -292,7 +351,9 @@ describe('Peribolos V2 API Integration Tests', () => {
   });
 
   it('GET /v1/audit/export?format=json returns payment request array', async () => {
-    const res = await fetch(`${baseUrl}/v1/audit/export?format=json`);
+    const res = await fetch(`${baseUrl}/v1/audit/export?format=json`, {
+      headers: { Authorization: `Bearer ${DEMO_KEY}` }
+    });
     assert.strictEqual(res.status, 200);
     const body = await res.json();
     assert.ok(Array.isArray(body));
@@ -302,7 +363,9 @@ describe('Peribolos V2 API Integration Tests', () => {
   });
 
   it('POST /v1/signers/pause pauses vault so subsequent payments BLOCK with VAULT_PAUSED', async () => {
-    const vaultsRes = await fetch(`${baseUrl}/v1/vaults`);
+    const vaultsRes = await fetch(`${baseUrl}/v1/vaults`, {
+      headers: { Authorization: `Bearer ${DEMO_KEY}` }
+    });
     const vaults = await vaultsRes.json();
     const vault = vaults.find((v: { agentId: string }) => v.agentId === 'ag_demo') || vaults[0];
     assert.ok(vault, 'demo vault required');
@@ -374,8 +437,74 @@ describe('Peribolos V2 API Integration Tests', () => {
     assert.ok(!('privateKey' in rotated));
   });
 
+  it('agent payment keys cannot perform workspace-management actions', async () => {
+    const createRes = await fetch(`${baseUrl}/v1/agents`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${DEMO_KEY}` },
+      body: JSON.stringify({ name: 'Scoped Agent Key Test', framework: 'custom' })
+    });
+    assert.strictEqual(createRes.status, 201);
+    const created = await createRes.json();
+    const setupRes = await fetch(`${baseUrl}/v1/setup/status`, {
+      headers: { Authorization: `Bearer ${created.apiKey}` }
+    });
+    assert.strictEqual(setupRes.status, 403);
+    const body = await setupRes.json();
+    assert.strictEqual(body.error, 'OPERATOR_KEY_REQUIRED');
+
+    const agentsRes = await fetch(`${baseUrl}/v1/agents`, {
+      headers: { Authorization: `Bearer ${created.apiKey}` }
+    });
+    assert.strictEqual(agentsRes.status, 200);
+    const scopedAgents = await agentsRes.json();
+    assert.deepStrictEqual(scopedAgents.map((agent: { id: string }) => agent.id), [created.agent.id]);
+
+    const vaultsRes = await fetch(`${baseUrl}/v1/vaults`, {
+      headers: { Authorization: `Bearer ${created.apiKey}` }
+    });
+    assert.strictEqual(vaultsRes.status, 200);
+    const scopedVaults = await vaultsRes.json();
+    assert.deepStrictEqual(scopedVaults.map((vault: { agentId: string }) => vault.agentId), [created.agent.id]);
+  });
+
+  it('POST /v1/signers/rotate refuses to drift a live vault from its on-chain agentKey', async () => {
+    const createRes = await fetch(`${baseUrl}/v1/agents`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${DEMO_KEY}` },
+      body: JSON.stringify({ name: 'Live Rotation Guard Agent', framework: 'custom' })
+    });
+    assert.strictEqual(createRes.status, 201);
+    const created = await createRes.json();
+    db.updateVault(created.vault.id, {
+      mode: 'live',
+      address: '0x2222222222222222222222222222222222222222'
+    });
+
+    const prepareRes = await fetch(`${baseUrl}/v1/signers/rotate/prepare`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${DEMO_KEY}` },
+      body: JSON.stringify({ vaultId: created.vault.id, agentId: created.agent.id })
+    });
+    assert.strictEqual(prepareRes.status, 201);
+    const prepared = await prepareRes.json();
+    assert.strictEqual(prepared.status, 'pending_owner_confirmation');
+    assert.ok(prepared.newSignerAddress?.startsWith('0x'));
+
+    const rotateRes = await fetch(`${baseUrl}/v1/signers/rotate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${DEMO_KEY}` },
+      body: JSON.stringify({ vaultId: created.vault.id, agentId: created.agent.id })
+    });
+    assert.strictEqual(rotateRes.status, 409);
+    const body = await rotateRes.json();
+    assert.strictEqual(body.error, 'LIVE_VAULT_ROTATION_REQUIRES_OWNER');
+    db.updateVault(created.vault.id, { mode: 'offline' });
+  });
+
   it('PATCH /v1/vaults/:id updates spending rules used by preflight', async () => {
-    const vaultsRes = await fetch(`${baseUrl}/v1/vaults`);
+    const vaultsRes = await fetch(`${baseUrl}/v1/vaults`, {
+      headers: { Authorization: `Bearer ${DEMO_KEY}` }
+    });
     const vaults = await vaultsRes.json();
     const vault = vaults.find((v: { agentId: string }) => v.agentId === 'ag_demo') || vaults[0];
 
@@ -414,15 +543,33 @@ describe('Peribolos V2 API Integration Tests', () => {
     });
   });
 
+  it('PATCH /v1/vaults/:id rejects a syntactically valid but non-contract live address', async () => {
+    const vaultsRes = await fetch(`${baseUrl}/v1/vaults`, {
+      headers: { Authorization: `Bearer ${DEMO_KEY}` }
+    });
+    const vaults = await vaultsRes.json();
+    const vault = vaults.find((v: { agentId: string }) => v.agentId === 'ag_demo') || vaults[0];
+    const patchRes = await fetch(`${baseUrl}/v1/vaults/${vault.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${DEMO_KEY}` },
+      body: JSON.stringify({ address: '0x1111111111111111111111111111111111111111' })
+    });
+    assert.strictEqual(patchRes.status, 400);
+    const body = await patchRes.json();
+    assert.ok(['NO_CONTRACT_CODE', 'VAULT_READ_FAILED', 'SIGNER_MISMATCH'].includes(body.error));
+  });
+
   it('GET /v1/activity returns payment requests with filters', async () => {
-    const res = await fetch(`${baseUrl}/v1/activity?workspaceId=ws_default`);
+    const res = await fetch(`${baseUrl}/v1/activity?workspaceId=ws_default`, {
+      headers: { Authorization: `Bearer ${DEMO_KEY}` }
+    });
     assert.strictEqual(res.status, 200);
     const body = await res.json();
     assert.ok(Array.isArray(body.paymentRequests));
     assert.ok(body.paymentRequests.length > 0);
   });
 
-  it('managed signer encrypt/decrypt roundtrip never exposes key via provisionSigner return', () => {
+  it('managed signer encrypt/decrypt roundtrip never exposes key via provisionSigner return', async () => {
     const sampleKey = '0x' + crypto.randomBytes(32).toString('hex');
     const enc = encryptPrivateKey(sampleKey);
     assert.ok(enc.encryptedPrivateKey);
@@ -431,11 +578,16 @@ describe('Peribolos V2 API Integration Tests', () => {
     const dec = decryptPrivateKey(enc.encryptedPrivateKey, enc.iv, enc.authTag);
     assert.strictEqual(dec, sampleKey);
 
-    const { address, record } = signerService.provisionSigner('v_test_enc', `ag_enc_${Date.now()}`);
+    const { address, record } = await signerService.provisionSigner('v_test_enc', `ag_enc_${Date.now()}`);
     assert.ok(address.startsWith('0x'));
-    assert.ok(record.encryptedPrivateKey);
-    // Public surface of provision is address + record; API routes must not serialize encrypted key to clients
-    assert.notStrictEqual(record.encryptedPrivateKey, sampleKey);
+    if (record.provider === 'circle') {
+      assert.ok(record.walletId);
+      assert.strictEqual(record.encryptedPrivateKey, '');
+    } else {
+      assert.ok(record.encryptedPrivateKey);
+      // Public surface of provision is address + record; API routes must not serialize encrypted key to clients
+      assert.notStrictEqual(record.encryptedPrivateKey, sampleKey);
+    }
   });
 
   it('policy preflight pure function blocks paused vault without network', () => {

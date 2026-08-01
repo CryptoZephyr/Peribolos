@@ -6,7 +6,7 @@ Rule-enforced USDC spending for AI agents on Arc. Two packages:
 - **`@peribolos/langchain`** — LangChain tools wrapping core, for agents.
 
 Both talk to the live factory on Arc testnet:
-`0xda3751cd08435D8b5137DD11A9a7797c214cfC4a` (chain `5042002`, v3.1).
+`0x84B6a05B1d71D5947Adf1438c6FFe8Eb66AdA31E` (chain `5042002`, v3.2).
 
 ## The two trust tiers
 

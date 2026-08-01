@@ -6,10 +6,47 @@ import { useToast } from "@/app/components/Toast";
 import { SkeletonCard } from "@/app/components/Skeleton";
 import { ExplorerBadge, CopyButton } from "@/app/components/ExplorerBadge";
 import { Modal } from "@/app/components/Modal";
+import { vaultAbi } from "../components/useVault";
+import { useSession } from "../session";
+import { isAddress, type Address } from "viem";
+
+type SetupStatus = {
+  signer: {
+    provider: "circle-dcw" | "local-dev" | "unconfigured";
+    circle: {
+      configured: boolean;
+      missingEnv: string[];
+      entitySecretEnvName?: "ENTITY_SECRET" | "CIRCLE_ENTITY_SECRET";
+    };
+    network: {
+      name: string;
+      chainId: number;
+      rpcUrlConfigured: boolean;
+    };
+    localFallbackEnabled: boolean;
+  };
+  vaultExecution: {
+    authorizationModel: string;
+  };
+};
+
+type SignerStatus = {
+  agentId: string;
+  vaultId?: string;
+  vaultAddress?: string;
+  vaultMode?: "live" | "offline";
+  activeSignerAddress?: string;
+  provider?: "circle" | "local";
+  signerStatus?: "active" | "rotated" | "revoked";
+  dbAligned: boolean;
+  vaultSignerAddress?: string;
+};
 
 export default function AgentsPage() {
   const [agents, setAgents] = useState<any[]>([]);
   const [vaults, setVaults] = useState<any[]>([]);
+  const [setupStatus, setSetupStatus] = useState<SetupStatus | null>(null);
+  const [signerStatuses, setSignerStatuses] = useState<SignerStatus[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [newAgentName, setNewAgentName] = useState("");
@@ -34,6 +71,7 @@ export default function AgentsPage() {
   const [actionLoading, setActionLoading] = useState(false);
 
   const toast = useToast();
+  const { address: ownerAddress, isConnected, writeVault } = useSession();
 
   useEffect(() => {
     loadAgents();
@@ -41,10 +79,16 @@ export default function AgentsPage() {
 
   async function loadAgents() {
     try {
-      const data: any = await fetchApi("/v1/agents");
-      const vaultData: any = await fetchApi("/v1/vaults");
+      const [data, vaultData, setupData, signerData] = await Promise.all([
+        fetchApi<any>("/v1/agents"),
+        fetchApi<any>("/v1/vaults"),
+        fetchApi<SetupStatus>("/v1/setup/status").catch(() => null),
+        fetchApi<{ agents?: SignerStatus[] }>("/v1/signers/status").catch(() => null),
+      ]);
       setAgents(data);
       setVaults(vaultData);
+      setSetupStatus(setupData);
+      setSignerStatuses(signerData?.agents || []);
     } catch (err) {
       console.warn("Failed to load agents:", err);
     } finally {
@@ -76,24 +120,54 @@ export default function AgentsPage() {
     }
   }
 
-  function promptRotateSigner(vaultId: string, agentId: string, agentName: string) {
+  function promptRotateSigner(
+    vaultId: string,
+    agentId: string,
+    agentName: string,
+    vaultMode: "live" | "offline",
+    vaultAddress?: string,
+  ) {
+    const liveRotation = vaultMode === "live";
     setConfirmModal({
       isOpen: true,
-      title: `Rotate Managed Signer for ${agentName}`,
-      description:
-        "This will generate a new AES-256 encrypted private key for this agent's managed signer. The old signer address will be revoked.",
-      confirmLabel: "Rotate Signer",
+      title: liveRotation ? `Rotate On-Chain Agent Key for ${agentName}` : `Rotate Managed Signer for ${agentName}`,
+      description: liveRotation
+        ? "This provisions a new managed signer, then asks the connected owner wallet to authorize rotateAgentKey on Arc Testnet. The new signer is activated only after the chain confirms the owner transaction."
+        : "This rotates the agent key used to initiate vault.pay. In Circle mode it provisions a new Arc Testnet DCW wallet; in local development it creates a new encrypted local signer.",
+      confirmLabel: liveRotation ? "Prepare Owner Rotation" : "Rotate Signer",
       confirmVariant: "primary",
       action: async () => {
         setActionLoading(true);
         try {
-          const res: any = await fetchApi("/v1/signers/rotate", {
-            method: "POST",
-            body: JSON.stringify({ vaultId, agentId }),
-          });
+          let res: any;
+          if (liveRotation) {
+            if (!isConnected || !ownerAddress || !writeVault || !vaultAddress || !isAddress(vaultAddress)) {
+              throw new Error("Connect the vault owner wallet before rotating a live signer.");
+            }
+            const prepared: any = await fetchApi("/v1/signers/rotate/prepare", {
+              method: "POST",
+              body: JSON.stringify({ vaultId, agentId }),
+            });
+            const newExpiry = Math.floor(Date.now() / 1000) + 365 * 24 * 60 * 60;
+            const txHash = await writeVault({
+              address: vaultAddress as Address,
+              abi: vaultAbi,
+              functionName: "rotateAgentKey",
+              args: [prepared.newSignerAddress as Address, BigInt(newExpiry)],
+            });
+            res = await fetchApi("/v1/signers/rotate/confirm", {
+              method: "POST",
+              body: JSON.stringify({ vaultId, agentId, newSignerAddress: prepared.newSignerAddress, txHash }),
+            });
+          } else {
+            res = await fetchApi("/v1/signers/rotate", {
+              method: "POST",
+              body: JSON.stringify({ vaultId, agentId }),
+            });
+          }
           toast.success(
-            "Signer Rotated Successfully",
-            `New Signer Address: ${res.newSignerAddress?.substring(0, 12)}...`
+            liveRotation ? "On-Chain Signer Rotated" : "Signer Rotated Successfully",
+            `New Signer Address: ${(res.activeSignerAddress || res.newSignerAddress)?.substring(0, 12)}...`
           );
           await loadAgents();
         } catch (err: any) {
@@ -154,6 +228,54 @@ export default function AgentsPage() {
         </button>
       </div>
 
+      {setupStatus?.signer && (
+        <div
+          className={`rounded-xl border p-5 text-xs ${
+            setupStatus.signer.provider === "circle-dcw"
+              ? "border-emerald-500/30 bg-emerald-500/10"
+              : "border-amber-500/25 bg-amber-500/10"
+          }`}
+        >
+          <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+            <div className="space-y-1.5">
+              <h3 className="font-bold uppercase tracking-wider text-text">
+                Agent Signer Backend
+              </h3>
+              <p className="text-text-muted leading-relaxed">
+                {setupStatus.signer.provider === "circle-dcw"
+                  ? "Circle Developer-Controlled Wallets are ready. New agents will receive Arc Testnet EOA wallets managed by the backend."
+                  : setupStatus.signer.provider === "local-dev"
+                    ? "Explicit local signer mode is enabled for development only. These wallets are not Circle DCW wallets and cannot authorize production payments."
+                    : "Circle DCW is not configured. Agent provisioning is paused so the dashboard cannot create a fake signer. Add the required Circle values, then reload."}
+              </p>
+            </div>
+            <span
+              className={`shrink-0 rounded-full border px-2.5 py-1 font-mono text-[11px] ${
+                setupStatus.signer.provider === "circle-dcw"
+                  ? "border-emerald-500/30 text-emerald-400"
+                  : "border-amber-500/30 text-amber-400"
+              }`}
+            >
+              {setupStatus.signer.provider === "circle-dcw"
+                ? "Circle DCW"
+                : setupStatus.signer.provider === "local-dev"
+                  ? "Local dev (explicit)"
+                  : "DCW unavailable"}
+            </span>
+          </div>
+          {setupStatus.signer.circle.missingEnv.length > 0 && (
+            <div className="mt-3 rounded-md border border-line bg-surface px-3 py-2 text-text-muted">
+              Missing in <code className="font-mono text-text">apps/api/.env</code>:{" "}
+              {setupStatus.signer.circle.missingEnv.map((key) => (
+                <code key={key} className="mr-1 font-mono text-amber-300">
+                  {key}
+                </code>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       {createdApiKey && (
         <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-5 space-y-2 animate-in fade-in duration-200">
           <div className="flex items-center justify-between">
@@ -192,6 +314,14 @@ export default function AgentsPage() {
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
           {agents.map((agent) => {
             const vault = vaults.find((v) => v.agentId === agent.id);
+            const signerStatus = signerStatuses.find((s) => s.agentId === agent.id);
+            const isCircleSigner = signerStatus?.provider === "circle";
+            const isLegacyLocalSigner = signerStatus?.provider === "local";
+            const displayedSigner = isCircleSigner
+              ? signerStatus?.activeSignerAddress
+              : setupStatus?.signer.provider === "local-dev"
+                ? signerStatus?.activeSignerAddress || vault?.agentSignerAddress
+                : undefined;
             return (
               <div
                 key={agent.id}
@@ -210,15 +340,22 @@ export default function AgentsPage() {
                 <div className="space-y-2.5 text-xs border-t border-b border-line py-3.5">
                   <div className="flex items-center justify-between">
                     <span className="text-text-muted">Managed Signer:</span>
-                    {vault?.agentSignerAddress ? (
+                    {displayedSigner ? (
                       <div className="flex items-center gap-2">
-                        <ExplorerBadge type="address" hashOrAddress={vault.agentSignerAddress} />
-                        <CopyButton text={vault.agentSignerAddress} />
+                        <ExplorerBadge type="address" hashOrAddress={displayedSigner} />
+                        <CopyButton text={displayedSigner} />
                       </div>
+                    ) : isLegacyLocalSigner ? (
+                      <span className="font-mono text-amber-300 text-[11px]">Legacy local signer — re-provision DCW</span>
                     ) : (
-                      <span className="font-mono text-emerald-400 text-[11px]">Server-side AES-256</span>
+                      <span className="font-mono text-text-muted text-[11px]">No Circle wallet provisioned</span>
                     )}
                   </div>
+                  {signerStatus && !signerStatus.dbAligned && signerStatus.activeSignerAddress && signerStatus.vaultSignerAddress && (
+                    <div className="rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-[11px] leading-relaxed text-amber-200">
+                      The active signer differs from the vault’s recorded agent key. Align them before funding or sending a live payment.
+                    </div>
+                  )}
                   <div className="flex items-center justify-between">
                     <span className="text-text-muted">Vault Contract Mode:</span>
                     <span className="font-mono text-[11px] font-medium text-text">
@@ -252,11 +389,15 @@ export default function AgentsPage() {
                 <div className="flex items-center gap-3 pt-1">
                   <button
                     onClick={() =>
-                      vault && promptRotateSigner(vault.id, agent.id, agent.name)
+                      vault && promptRotateSigner(vault.id, agent.id, agent.name, vault.mode, vault.address)
                     }
                     className="flex-1 rounded-md border border-line bg-surface px-3 py-2 text-xs font-semibold text-text hover:bg-surface-raised transition-colors"
                   >
-                    🔄 Rotate Signer
+                    {vault?.mode === "live"
+                      ? "🔑 Rotate On-Chain Key"
+                      : isLegacyLocalSigner
+                        ? "♻ Re-provision DCW"
+                        : "🔄 Rotate Signer"}
                   </button>
                   <button
                     onClick={() =>

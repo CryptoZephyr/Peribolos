@@ -30,6 +30,16 @@ export interface PeribolosToolsConfig extends PeribolosVaultClientConfig {}
 
 const ADDRESS_RE = /^0x[0-9a-fA-F]{40}$/;
 
+type PeribolosPayInput = {
+  to: string;
+  amountUsdc: number;
+  actionType?: number;
+};
+
+type PeribolosBuyInput = {
+  url: string;
+};
+
 /** Format 6-dec base units as a human USDC string. */
 function fmt(amount: bigint): string {
   const whole = amount / 1_000_000n;
@@ -48,7 +58,7 @@ export function createPeribolosTools(config: PeribolosToolsConfig) {
   const client = new PeribolosVaultClient(config);
 
   const peribolosPay = tool(
-    async ({ to, amountUsdc, actionType }) => {
+    async ({ to, amountUsdc, actionType }: PeribolosPayInput) => {
       if (!ADDRESS_RE.test(to)) {
         return JSON.stringify({ ok: false, error: "INVALID_ADDRESS", to });
       }
@@ -106,7 +116,7 @@ export function createPeribolosTools(config: PeribolosToolsConfig) {
   );
 
   const peribolosBuy = tool(
-    async ({ url }) => {
+    async ({ url }: PeribolosBuyInput) => {
       try {
         const result = await client.buy(url);
         return JSON.stringify({

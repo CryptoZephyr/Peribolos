@@ -41,6 +41,6 @@ The agent key is a low-trust, vault-scoped key: it can only *propose* payments.
 
 ## Verified
 
-Live against smoke vault `0x62D5487d6523fc4D34692e1DbF8EBC01F39BbC7B` on
-2026-07-18: x402 petty-cash buy + legit vault pay + injected drain blocked with
-`RECIPIENT_NOT_ALLOWLISTED` (full 4-beat demo).
+Smoke domain created and funded at vault `0xac5d542EdCB15972570685B2Fdb87be71d1378a1`
+on 2026-07-31. Run the scripted demo to produce the latest legit-pay and injected-drain
+evidence against this deployment.

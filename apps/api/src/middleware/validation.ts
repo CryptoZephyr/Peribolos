@@ -4,12 +4,28 @@ import { z, ZodError } from 'zod';
 const ethereumAddressRegex = /^0x[0-9a-fA-F]{40}$/;
 const txHashRegex = /^0x[0-9a-fA-F]{64}$/;
 
+/** USDC amounts are represented in whole 6-decimal ERC-20 units on Arc. */
+function hasUsdcPrecision(value: number): boolean {
+  const scaled = value * 1_000_000;
+  const rounded = Math.round(scaled);
+  return Number.isSafeInteger(rounded) && Math.abs(scaled - rounded) < 1e-7;
+}
+
+export function usdcAmountToUnits(value: number): bigint {
+  if (!Number.isFinite(value) || value <= 0 || !hasUsdcPrecision(value)) {
+    throw new Error('USDC amount must be positive and use no more than 6 decimal places.');
+  }
+  return BigInt(Math.round(value * 1_000_000));
+}
+
 export const paymentSchema = z.object({
   payeeAddress: z.string().regex(ethereumAddressRegex, {
     message: 'payeeAddress must be a 20-byte 0x-prefixed hex address.'
   }),
   amountUsdc: z.number().positive({
     message: 'amountUsdc must be a positive number.'
+  }).refine(hasUsdcPrecision, {
+    message: 'amountUsdc must use no more than 6 decimal places (USDC precision).'
   }),
   actionType: z.number().int().min(0).max(255).optional().default(1),
   idempotencyKey: z.string().min(1).optional(),
@@ -51,7 +67,9 @@ export const updateVaultSchema = z.object({
 });
 
 export const fundVaultSchema = z.object({
-  amountUsdc: z.number().positive({ message: 'positive amountUsdc required' }),
+  amountUsdc: z.number().positive({ message: 'positive amountUsdc required' }).refine(hasUsdcPrecision, {
+    message: 'amountUsdc must use no more than 6 decimal places (USDC precision).'
+  }),
   txHash: z.string().regex(txHashRegex, {
     message: 'txHash must be a real 32-byte transaction hash'
   }),

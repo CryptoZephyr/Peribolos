@@ -28,7 +28,7 @@ export function OwnerControls({
   balance: bigint;
   onSettled: () => void;
 }) {
-  const { address, isConnected, method, writeVault } = useSession();
+  const { address, isConnected, writeVault } = useSession();
   const [pendingAction, setPendingAction] = useState<
     "pause" | "unpause" | "sweep" | "withdraw" | null
   >(null);
@@ -94,11 +94,6 @@ export function OwnerControls({
           <SlidersHorizontal size={14} weight="bold" />
           Owner controls
         </div>
-        {isOwner && method === "passkey" && (
-          <span className="rounded-full bg-accent-tint px-2 py-0.5 text-[10px] font-medium text-accent">
-            gasless via passkey
-          </span>
-        )}
       </div>
 
       <div className="mt-4 flex flex-wrap gap-3" title={!isOwner ? disabledTitle : undefined}>
