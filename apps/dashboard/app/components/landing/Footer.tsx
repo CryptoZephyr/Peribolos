@@ -4,10 +4,10 @@ import { LandingBrand } from "./LandingBrand";
 
 export function Footer() {
   return (
-    <footer className="border-t border-line bg-surface-raised px-5 py-10 sm:px-8">
-      <div className="mx-auto flex max-w-[1240px] flex-col items-start justify-between gap-4 text-sm text-text-faint sm:flex-row sm:items-center">
+    <footer className="border-t border-line bg-surface-raised px-5 py-10 sm:px-8 font-sans">
+      <div className="mx-auto flex max-w-[1240px] flex-col items-start justify-between gap-6 text-xs text-text-faint sm:flex-row sm:items-center">
         <LandingBrand />
-        <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-2 font-medium">
           <a
             href={addressUrl(FACTORY_ADDRESS)}
             target="_blank"
@@ -22,7 +22,13 @@ export function Footer() {
           <Link href="/education" className="transition-colors hover:text-text">
             Education Center
           </Link>
-          <span>Built on Arc testnet</span>
+          <Link href="/privacy" className="transition-colors hover:text-text">
+            Privacy Policy
+          </Link>
+          <Link href="/terms" className="transition-colors hover:text-text">
+            Terms of Service
+          </Link>
+          <span className="text-text-muted">Built on Arc testnet</span>
         </div>
       </div>
     </footer>

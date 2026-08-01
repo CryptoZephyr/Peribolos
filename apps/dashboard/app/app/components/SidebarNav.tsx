@@ -8,6 +8,7 @@ import {
   Code,
   CreditCard,
   Gauge,
+  Gear,
   Key,
   LockKey,
   PlugsConnected,
@@ -25,6 +26,7 @@ const GROUPS = [
       ["Agents", "/app/agents", Robot],
       ["Vaults", "/app/vaults", Vault],
       ["Payees", "/app/payees", UsersThree],
+      ["Settings", "/app/settings", Gear],
     ],
   },
   {
@@ -63,7 +65,7 @@ export function SidebarNav() {
                   href={href}
                   prefetch
                   aria-current={active ? "page" : undefined}
-                  className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-[13px] font-medium ${
+                  className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-[13px] font-medium transition-all ${
                     active
                       ? "bg-text text-white shadow-sm"
                       : "text-text-muted hover:bg-surface hover:text-text"
@@ -77,7 +79,7 @@ export function SidebarNav() {
           </div>
         </div>
       ))}
-      <div className="border-t border-line pt-5">
+      <div className="border-t border-line pt-5 space-y-1">
         <Link href="/docs" className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-[13px] font-medium text-text-muted hover:bg-surface hover:text-text">
           <Code size={17} />
           <span>SDK docs</span>
@@ -86,7 +88,7 @@ export function SidebarNav() {
           <LockKey size={17} />
           <span>Education center</span>
         </Link>
-        <Link href="/app/api-keys" className="mt-1 flex items-center gap-3 rounded-lg px-3 py-2.5 text-[13px] font-medium text-text-muted hover:bg-surface hover:text-text">
+        <Link href="/app/api-keys" className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-[13px] font-medium text-text-muted hover:bg-surface hover:text-text">
           <PlugsConnected size={17} />
           <span>Integrations</span>
         </Link>
