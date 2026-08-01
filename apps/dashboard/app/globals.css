@@ -1,25 +1,25 @@
 @import "tailwindcss";
 
 /*
-  Peribolos theme — ONE theme, locked dark (Page Theme Lock).
-  Base: zinc-950 family. Single accent: emerald. Semantic red is reserved
-  exclusively for blocked-payment state (product semantics, not decoration).
+  Peribolos theme — ONE theme, locked light (Page Theme Lock).
+  Base: cool white / ink family. Single accent: deep emerald. Semantic red is
+  reserved exclusively for blocked-payment state.
   Shape system: soft (12px radius) everywhere; pills only for status chips.
 */
 @theme {
-  --color-surface: #0b0b0d; /* off-black, never pure #000 */
-  --color-surface-raised: #131316;
-  --color-surface-overlay: #1b1b1f;
-  --color-line: #26262b;
-  --color-line-strong: #34343a;
-  --color-text: #f2f2f3; /* off-white, never pure #fff */
-  --color-text-muted: #a1a1aa;
-  --color-text-faint: #6b6b74;
-  --color-accent: #34d399; /* emerald-400: the single accent */
-  --color-accent-deep: #059669;
-  --color-accent-tint: rgba(52, 211, 153, 0.08);
-  --color-blocked: #f87171; /* semantic only: blocked payments */
-  --color-blocked-tint: rgba(248, 113, 113, 0.08);
+  --color-surface: #f7f8fa;
+  --color-surface-raised: #ffffff;
+  --color-surface-overlay: #ffffff;
+  --color-line: #e5e7eb;
+  --color-line-strong: #cbd0d8;
+  --color-text: #111827;
+  --color-text-muted: #667085;
+  --color-text-faint: #98a2b3;
+  --color-accent: #047857;
+  --color-accent-deep: #065f46;
+  --color-accent-tint: rgba(4, 120, 87, 0.08);
+  --color-blocked: #c2413d;
+  --color-blocked-tint: rgba(194, 65, 61, 0.08);
 
   --radius-card: 12px;
 
@@ -28,7 +28,7 @@
 }
 
 html {
-  color-scheme: dark;
+  color-scheme: light;
   scroll-behavior: smooth;
 }
 
@@ -46,11 +46,58 @@ html {
 }
 
 body {
-  background: var(--color-surface);
+  background:
+    radial-gradient(circle at 85% -5%, rgba(4, 120, 87, 0.06), transparent 22rem),
+    var(--color-surface);
   color: var(--color-text);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+}
+
+button,
+a,
+input,
+select,
+textarea {
+  -webkit-tap-highlight-color: transparent;
+}
+
+button,
+a {
+  transition-property: color, background-color, border-color, box-shadow, opacity, transform;
+  transition-duration: 180ms;
+  transition-timing-function: ease-out;
+}
+
+button:active,
+a:active {
+  transform: translateY(1px);
+}
+
+::placeholder {
+  color: var(--color-text-faint);
+}
+
+.app-panel {
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-card);
+  background: var(--color-surface-raised);
+  box-shadow: 0 10px 28px rgba(16, 24, 40, 0.045);
+}
+
+.app-panel-muted {
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-card);
+  background: #fbfcfd;
+}
+
+.eyebrow {
+  color: var(--color-text-faint);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 ::selection {

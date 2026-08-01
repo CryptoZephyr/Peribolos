@@ -6,7 +6,7 @@ import { useToast } from "@/app/components/Toast";
 import { SkeletonCard } from "@/app/components/Skeleton";
 import { ExplorerBadge, CopyButton } from "@/app/components/ExplorerBadge";
 import { Modal } from "@/app/components/Modal";
-import { vaultAbi } from "../components/useVault";
+import { vaultAbi } from "../components/contractAbis";
 import { useSession } from "../session";
 import { isAddress, type Address } from "viem";
 

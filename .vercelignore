@@ -1,0 +1,11 @@
+node_modules
+.next
+apps/dashboard/.next
+apps/dashboard/out
+contracts
+apps/api
+apps/demo-agent
+apps/demo-seller
+dogfood-output
+archive
+data

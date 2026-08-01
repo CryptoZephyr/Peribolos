@@ -13,19 +13,41 @@ function resolveApiKey(): string | undefined {
   return window.localStorage.getItem('peribolos.apiKey.v1') || undefined;
 }
 
+async function getSessionForRequest() {
+  if (!supabase) return null;
+
+  try {
+    return await Promise.race([
+      supabase.auth.getSession().then(({ data }) => data.session),
+      new Promise<null>((resolve) => window.setTimeout(() => resolve(null), 1_500)),
+    ]);
+  } catch {
+    return null;
+  }
+}
+
 export async function fetchApi<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const url = `${API_BASE_URL}${endpoint}`;
   const apiKey = resolveApiKey();
-  const { data: { session } } = supabase ? await supabase.auth.getSession() : { data: { session: null } };
+  const session = await getSessionForRequest();
   const bearer = session?.access_token || apiKey;
-  const res = await fetch(url, {
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(bearer ? { Authorization: `Bearer ${bearer}` } : {}),
-      ...options.headers,
-    },
-  });
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), 5_000);
+  let res: Response;
+
+  try {
+    res = await fetch(url, {
+      ...options,
+      signal: options.signal ?? controller.signal,
+      headers: {
+        'Content-Type': 'application/json',
+        ...(bearer ? { Authorization: `Bearer ${bearer}` } : {}),
+        ...options.headers,
+      },
+    });
+  } finally {
+    window.clearTimeout(timeout);
+  }
 
   if (!res.ok) {
     if (res.status === 401 && typeof window !== 'undefined' && !session?.access_token) {

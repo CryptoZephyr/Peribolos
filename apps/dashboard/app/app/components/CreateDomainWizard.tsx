@@ -34,7 +34,7 @@ import {
 import { ActionType, PERIBOLOS_FACTORY_ADDRESS } from "@peribolos/core";
 import { addressUrl, txUrl, publicClient } from "@/lib/chain";
 import { describeError } from "@/lib/errors";
-import { factoryAbi } from "./useVault";
+import { factoryAbi } from "./contractAbis";
 import { useSession } from "../session";
 
 type KeyMode = "generate" | "paste";

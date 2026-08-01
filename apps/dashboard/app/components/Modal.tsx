@@ -25,7 +25,7 @@ export function Modal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-      <div className="w-full max-w-md rounded-xl border border-line bg-surface-raised p-6 shadow-2xl space-y-4">
+      <div className="w-full max-w-md space-y-4 rounded-xl border border-line-strong bg-surface-raised p-6 shadow-[0_28px_80px_rgba(16,24,40,0.24)]">
         <div className="flex items-center justify-between border-b border-line pb-3">
           <h3 className="text-base font-bold text-text">{title}</h3>
           <button

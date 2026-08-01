@@ -7,7 +7,7 @@ export const BLOCKED_TX_HASH =
 
 export function Problem() {
   return (
-    <section className="mx-auto max-w-[1200px] px-6 py-24 sm:py-32">
+    <section className="mx-auto max-w-[1240px] px-5 py-24 sm:px-8 sm:py-32">
       <Reveal className="max-w-2xl">
         <h2 className="text-3xl font-medium leading-tight tracking-tight text-text sm:text-4xl">
           Prompt injection already drains agent wallets.
@@ -22,7 +22,7 @@ export function Problem() {
         </p>
       </Reveal>
 
-      <Reveal className="mt-10 max-w-2xl rounded-[12px] border border-line bg-surface-raised p-6">
+      <Reveal className="app-panel mt-10 max-w-2xl p-6 sm:p-7">
         <div className="flex items-center justify-between gap-4">
           <span className="text-xs font-medium text-text-faint">
             On-chain evidence

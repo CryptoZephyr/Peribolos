@@ -13,7 +13,7 @@ import {
   Eye,
   Lightning,
 } from "@phosphor-icons/react";
-import { vaultAbi } from "./useVault";
+import { vaultAbi } from "./contractAbis";
 import { publicClient, formatUsdc, shortAddress, txUrl, USDC } from "@/lib/chain";
 
 // ---------------------------------------------------------------------------

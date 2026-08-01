@@ -24,18 +24,29 @@ export function SupabaseAuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!supabase) return;
     let active = true;
-    supabase.auth.getSession().then(({ data }) => {
-      if (active) {
-        setSession(data.session);
-        setLoading(false);
-      }
-    });
+    const fallbackTimer = window.setTimeout(() => {
+      if (active) setLoading(false);
+    }, 2500);
+
+    supabase.auth
+      .getSession()
+      .then(({ data }) => {
+        if (active) setSession(data.session);
+      })
+      .catch(() => {
+        if (active) setSession(null);
+      })
+      .finally(() => {
+        window.clearTimeout(fallbackTimer);
+        if (active) setLoading(false);
+      });
     const { data } = supabase.auth.onAuthStateChange((_event, next) => {
       setSession(next);
       setLoading(false);
     });
     return () => {
       active = false;
+      window.clearTimeout(fallbackTimer);
       data.subscription.unsubscribe();
     };
   }, []);

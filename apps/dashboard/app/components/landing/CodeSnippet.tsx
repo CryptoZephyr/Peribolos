@@ -13,8 +13,8 @@ model.bindTools(tools);`;
 
 export function CodeSnippet() {
   return (
-    <section className="border-t border-line px-6 py-24 sm:py-32">
-      <div className="mx-auto grid max-w-[1200px] gap-10 md:grid-cols-2 md:items-center">
+    <section className="border-t border-line bg-[#fbfcfd] px-5 py-24 sm:px-8 sm:py-32">
+      <div className="mx-auto grid max-w-[1240px] gap-10 md:grid-cols-2 md:items-center">
         <Reveal>
           <h2 className="text-3xl font-medium leading-tight tracking-tight text-text sm:text-4xl">
             Ten lines, not a rewrite.
@@ -27,7 +27,7 @@ export function CodeSnippet() {
         </Reveal>
 
         <Reveal>
-          <pre className="overflow-x-auto rounded-[12px] border border-line bg-surface-raised p-6 font-mono text-[13px] leading-relaxed text-text-muted">
+          <pre className="overflow-x-auto rounded-2xl border border-line bg-text p-6 font-mono text-[13px] leading-relaxed text-slate-300 shadow-[0_16px_36px_rgba(16,24,40,0.12)]">
             <code>{SNIPPET}</code>
           </pre>
         </Reveal>
