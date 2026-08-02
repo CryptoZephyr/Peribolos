@@ -6,15 +6,12 @@ import { useRouter } from "next/navigation";
 import {
   ArrowRight,
   ShieldCheck,
-  Eye,
-  EyeSlash,
   Check,
   Wallet,
   Key,
   EnvelopeSimple,
   Globe,
   LockKey,
-  Lightning,
   Sparkle,
 } from "@phosphor-icons/react";
 import { useSupabaseAuth } from "@/app/auth/SupabaseAuthProvider";
@@ -27,9 +24,9 @@ export default function LoginPage() {
   // Mode and form states
   const [mode, setMode] = useState<"signup" | "login">("signup");
   const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
   const [subscribeUpdates, setSubscribeUpdates] = useState(true);
+  const [walletAvailable, setWalletAvailable] = useState<boolean | null>(null);
+  const [passkeyAvailable, setPasskeyAvailable] = useState<boolean | null>(null);
 
   // Status states
   const [sent, setSent] = useState(false);
@@ -43,6 +40,11 @@ export default function LoginPage() {
   useEffect(() => {
     if (session) router.replace("/app");
   }, [router, session]);
+
+  useEffect(() => {
+    setWalletAvailable("ethereum" in window);
+    setPasskeyAvailable(typeof window.PublicKeyCredential !== "undefined" && Boolean(navigator.credentials));
+  }, []);
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -67,12 +69,25 @@ export default function LoginPage() {
   async function signInWith(method: "web3" | "passkey") {
     setError(null);
     setSent(false);
+    if (method === "web3" && walletAvailable === false) {
+      setError("No Ethereum wallet detected. Open Peribolos in a browser with MetaMask, Rabby, or another injected wallet.");
+      return;
+    }
+    if (method === "passkey" && passkeyAvailable === false) {
+      setError("Passkeys are not available in this browser. Use a secure, passkey-capable browser on a device with Windows Hello, Touch ID, or another passkey manager.");
+      return;
+    }
     setMethodBusy(method);
     try {
       if (method === "web3") await signInWithWeb3();
       else await signInWithPasskey();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to complete sign-in.");
+      const message = err instanceof Error ? err.message : "Unable to complete sign-in.";
+      setError(
+        message.includes("webauthn_credential_not_found") || message.toLowerCase().includes("no passkey")
+          ? "No passkey is registered for this account yet. Sign in with email first, then register this device from Settings."
+          : message,
+      );
     } finally {
       setMethodBusy(null);
     }
@@ -250,7 +265,7 @@ export default function LoginPage() {
               {/* Email Input */}
               <div>
                 <label htmlFor="email" className="block text-xs font-semibold text-slate-800 mb-1.5">
-                  Email
+                  Work email
                 </label>
                 <div className="relative">
                   <input
@@ -265,38 +280,14 @@ export default function LoginPage() {
                   />
                   <EnvelopeSimple size={18} className="absolute right-3.5 top-3.5 text-slate-400 pointer-events-none" />
                 </div>
-              </div>
-
-              {/* Optional Password field with toggle visibility icon (matches reference screenshot) */}
-              <div>
-                <label htmlFor="password" className="block text-xs font-semibold text-slate-800 mb-1.5 flex items-center justify-between">
-                  <span>Password / OTP</span>
-                  <span className="text-[11px] font-normal text-slate-400">Magic Link preferred</span>
-                </label>
-                <div className="relative">
-                  <input
-                    id="password"
-                    type={showPassword ? "text" : "password"}
-                    value={password}
-                    onChange={(event) => setPassword(event.target.value)}
-                    placeholder="••••••••••••"
-                    disabled={!configured || busy}
-                    className="w-full rounded-xl border border-slate-200 bg-slate-50/50 px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 outline-none transition-all focus:bg-white focus:border-emerald-600 focus:ring-4 focus:ring-emerald-500/10 disabled:opacity-60"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3.5 top-3.5 text-slate-400 hover:text-slate-600 focus:outline-none"
-                    aria-label={showPassword ? "Hide password" : "Show password"}
-                  >
-                    {showPassword ? <EyeSlash size={18} /> : <Eye size={18} />}
-                  </button>
-                </div>
+                <p className="mt-2 text-[11px] leading-relaxed text-slate-400">
+                  We&apos;ll send a secure sign-in link. No password to remember.
+                </p>
               </div>
 
               {/* Terms of Service Disclaimer */}
               <p className="text-[11px] leading-relaxed text-slate-500 pt-1">
-                By signing up, you accept Peribolos{" "}
+                {mode === "signup" ? "By creating an account, you accept Peribolos " : "By continuing, you accept Peribolos "}
                 <Link href="/docs" className="font-semibold text-slate-800 underline underline-offset-2">
                   privacy policy
                 </Link>{" "}
@@ -313,7 +304,7 @@ export default function LoginPage() {
                 disabled={!configured || busy || loading}
                 className="w-full flex items-center justify-center gap-2 rounded-xl bg-slate-950 py-3.5 px-6 text-sm font-semibold text-white shadow-md hover:bg-slate-800 focus:ring-2 focus:ring-slate-900 transition-all disabled:cursor-not-allowed disabled:opacity-60"
               >
-                {busy ? "Sending sign-in link..." : mode === "signup" ? "Sign up" : "Sign in"}
+                {busy ? "Sending secure link..." : "Continue with email"}
                 {!busy && <ArrowRight size={16} weight="bold" />}
               </button>
             </form>
@@ -330,23 +321,27 @@ export default function LoginPage() {
               <button
                 type="button"
                 onClick={() => signInWith("web3")}
-                disabled={!configured || Boolean(methodBusy) || busy}
+                disabled={!configured || Boolean(methodBusy) || busy || walletAvailable === false}
                 className="w-full flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white py-3 px-4 text-xs font-semibold text-slate-700 shadow-sm hover:border-slate-300 hover:bg-slate-50/80 transition-all disabled:cursor-not-allowed disabled:opacity-60"
               >
                 <Wallet size={16} className="text-emerald-600" />
-                {methodBusy === "web3" ? "Connecting Web3..." : "Continue with Web3 Wallet"}
+                {methodBusy === "web3" ? "Connecting wallet..." : walletAvailable === false ? "Wallet not detected" : "Continue with Web3 Wallet"}
               </button>
 
               <button
                 type="button"
                 onClick={() => signInWith("passkey")}
-                disabled={!configured || Boolean(methodBusy) || busy}
+                disabled={!configured || Boolean(methodBusy) || busy || passkeyAvailable === false}
                 className="w-full flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white py-3 px-4 text-xs font-semibold text-slate-700 shadow-sm hover:border-slate-300 hover:bg-slate-50/80 transition-all disabled:cursor-not-allowed disabled:opacity-60"
               >
                 <Key size={16} className="text-slate-600" />
-                {methodBusy === "passkey" ? "Connecting Passkey..." : "Continue with Passkey"}
+                {methodBusy === "passkey" ? "Checking passkey..." : passkeyAvailable === false ? "Passkey unavailable" : "Continue with Passkey"}
               </button>
             </div>
+
+            <p className="mt-3 text-center text-[11px] leading-relaxed text-slate-400">
+              New to passkeys? Sign in with email first, then register this device from Settings.
+            </p>
 
             {/* Already have an account? Log In toggle */}
             <p className="mt-5 text-center text-xs text-slate-500">

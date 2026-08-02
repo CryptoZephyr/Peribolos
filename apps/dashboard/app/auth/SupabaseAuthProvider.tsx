@@ -12,6 +12,7 @@ type AuthContextValue = {
   signInWithOtp: (email: string) => Promise<void>;
   signInWithWeb3: () => Promise<void>;
   signInWithPasskey: () => Promise<void>;
+  registerPasskey: () => Promise<void>;
   signOut: () => Promise<void>;
 };
 
@@ -66,6 +67,9 @@ export function SupabaseAuthProvider({ children }: { children: ReactNode }) {
     },
     signInWithWeb3: async () => {
       if (!supabase) throw new Error("Supabase Auth is not configured for this dashboard.");
+      if (typeof window === "undefined" || !("ethereum" in window)) {
+        throw new Error("No Ethereum wallet detected. Open Peribolos in a browser with MetaMask, Rabby, or another injected wallet.");
+      }
       const { error } = await supabase.auth.signInWithWeb3({
         chain: "ethereum",
         statement: "Sign in to Peribolos to manage rule-enforced agent vaults.",
@@ -74,7 +78,18 @@ export function SupabaseAuthProvider({ children }: { children: ReactNode }) {
     },
     signInWithPasskey: async () => {
       if (!supabase) throw new Error("Supabase Auth is not configured for this dashboard.");
+      if (typeof window === "undefined" || typeof window.PublicKeyCredential === "undefined" || !navigator.credentials) {
+        throw new Error("Passkeys are not available in this browser. Use a secure, passkey-capable browser on a device with Windows Hello, Touch ID, or another passkey manager.");
+      }
       const { error } = await supabase.auth.signInWithPasskey();
+      if (error) throw error;
+    },
+    registerPasskey: async () => {
+      if (!supabase) throw new Error("Supabase Auth is not configured for this dashboard.");
+      if (typeof window === "undefined" || typeof window.PublicKeyCredential === "undefined" || !navigator.credentials) {
+        throw new Error("Passkeys are not available in this browser. Use a secure, passkey-capable browser on a device with Windows Hello, Touch ID, or another passkey manager.");
+      }
+      const { error } = await supabase.auth.registerPasskey();
       if (error) throw error;
     },
     signOut: async () => {

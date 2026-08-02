@@ -12,9 +12,11 @@ import {
   Wallet,
 } from "@phosphor-icons/react";
 import { useToast } from "@/app/components/Toast";
+import { useSupabaseAuth } from "@/app/auth/SupabaseAuthProvider";
 
 export default function WorkspaceSettingsPage() {
   const toast = useToast();
+  const { configured, registerPasskey } = useSupabaseAuth();
   const [activeTab, setActiveTab] = useState<"general" | "security" | "network" | "webhooks">("general");
 
   // Form states
@@ -26,6 +28,22 @@ export default function WorkspaceSettingsPage() {
   const [rpcUrl, setRpcUrl] = useState("https://arc-testnet.rpc.peribolos.io");
   const [webhookUrl, setWebhookUrl] = useState("https://api.peribolos.io/v1/webhooks/alerts");
   const [saving, setSaving] = useState(false);
+  const [registeringPasskey, setRegisteringPasskey] = useState(false);
+
+  async function handleRegisterPasskey() {
+    setRegisteringPasskey(true);
+    try {
+      await registerPasskey();
+      toast.success("Passkey registered", "This device can now sign in to Peribolos without an email link.");
+    } catch (error) {
+      toast.error(
+        "Passkey registration failed",
+        error instanceof Error ? error.message : "Unable to register a passkey on this device.",
+      );
+    } finally {
+      setRegisteringPasskey(false);
+    }
+  }
 
   function handleSave(e: React.FormEvent) {
     e.preventDefault();
@@ -151,6 +169,29 @@ export default function WorkspaceSettingsPage() {
             <div>
               <h2 className="text-base font-semibold text-text">Security & Enforcement Automation</h2>
               <p className="text-xs text-text-muted mt-1">Control contract-level triggers and authentication requirements.</p>
+            </div>
+
+            <div className="flex flex-col gap-4 rounded-xl border border-line bg-surface-raised p-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-start gap-3">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-accent/10 text-accent">
+                  <Key size={18} weight="bold" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-text">Passkey sign-in</p>
+                  <p className="mt-1 max-w-xl text-xs leading-relaxed text-text-muted">
+                    Register this device after signing in with email. You can then use Windows Hello, Touch ID, or your passkey manager at login.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={handleRegisterPasskey}
+                disabled={!configured || registeringPasskey}
+                className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg bg-text px-4 py-2.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <Key size={14} weight="bold" />
+                {registeringPasskey ? "Registering..." : "Register this device"}
+              </button>
             </div>
 
             <div className="space-y-4 pt-2 divide-y divide-line">
