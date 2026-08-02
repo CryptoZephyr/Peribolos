@@ -259,11 +259,11 @@ export default function LoginPage() {
               {/* Terms of Service Disclaimer */}
               <p className="text-[11px] leading-relaxed text-slate-500 pt-1">
                 {mode === "signup" ? "By creating an account, you accept Peribolos " : "By continuing, you accept Peribolos "}
-                <Link href="/docs" className="font-semibold text-slate-800 underline underline-offset-2">
+                <Link href="/privacy" className="font-semibold text-slate-800 underline underline-offset-2">
                   privacy policy
                 </Link>{" "}
                 and{" "}
-                <Link href="/docs" className="font-semibold text-slate-800 underline underline-offset-2">
+                <Link href="/terms" className="font-semibold text-slate-800 underline underline-offset-2">
                   terms of service
                 </Link>
                 .
