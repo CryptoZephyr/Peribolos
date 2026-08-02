@@ -10,6 +10,7 @@ import {
   Check,
   LockKey,
   Wallet,
+  Trash,
 } from "@phosphor-icons/react";
 import { useToast } from "@/app/components/Toast";
 import { useSupabaseAuth } from "@/app/auth/SupabaseAuthProvider";
@@ -19,7 +20,7 @@ const SETTINGS_STORAGE_KEY = "peribolos.workspace-settings.v1";
 
 export default function WorkspaceSettingsPage() {
   const toast = useToast();
-  const { configured, registerPasskey } = useSupabaseAuth();
+  const { configured, session, registerPasskey, listPasskeys, deletePasskey } = useSupabaseAuth();
   const [activeTab, setActiveTab] = useState<"general" | "security" | "network" | "webhooks">("general");
 
   // Form states
@@ -32,6 +33,31 @@ export default function WorkspaceSettingsPage() {
   const [webhookUrl, setWebhookUrl] = useState("");
   const [saving, setSaving] = useState(false);
   const [registeringPasskey, setRegisteringPasskey] = useState(false);
+  const [activePasskeys, setActivePasskeys] = useState<Awaited<ReturnType<typeof listPasskeys>>>([]);
+  const [loadingPasskeys, setLoadingPasskeys] = useState(false);
+  const [passkeyError, setPasskeyError] = useState<string | null>(null);
+
+  async function refreshPasskeys() {
+    if (!session) {
+      setActivePasskeys([]);
+      setPasskeyError(null);
+      return;
+    }
+    setLoadingPasskeys(true);
+    setPasskeyError(null);
+    try {
+      setActivePasskeys(await listPasskeys());
+    } catch (error) {
+      setPasskeyError(error instanceof Error ? error.message : "Unable to load active passkeys.");
+    } finally {
+      setLoadingPasskeys(false);
+    }
+  }
+
+  useEffect(() => {
+    if (activeTab !== "security" || !configured) return;
+    void refreshPasskeys();
+  }, [activeTab, configured, session]);
 
   useEffect(() => {
     try {
@@ -53,6 +79,7 @@ export default function WorkspaceSettingsPage() {
     setRegisteringPasskey(true);
     try {
       await registerPasskey();
+      await refreshPasskeys();
       toast.success("Passkey registered", "This device can now sign in to Peribolos without an email link.");
     } catch (error) {
       toast.error(
@@ -207,12 +234,95 @@ export default function WorkspaceSettingsPage() {
               <button
                 type="button"
                 onClick={handleRegisterPasskey}
-                disabled={!configured || registeringPasskey}
+                disabled={!configured || !session || registeringPasskey}
                 className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg bg-text px-4 py-2.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-60"
               >
                 <Key size={14} weight="bold" />
                 {registeringPasskey ? "Registering..." : "Register this device"}
               </button>
+            </div>
+
+            <div className="rounded-xl border border-line bg-surface-raised p-4">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <ShieldCheck size={17} weight="bold" className="text-accent" />
+                    <h3 className="text-sm font-semibold text-text">Active passkeys</h3>
+                    {!loadingPasskeys && (
+                      <span className="rounded-full bg-accent/10 px-2 py-0.5 text-[10px] font-semibold text-accent">
+                        {activePasskeys.length} {activePasskeys.length === 1 ? "device" : "devices"}
+                      </span>
+                    )}
+                  </div>
+                  <p className="mt-1 text-xs leading-relaxed text-text-muted">
+                    Review the devices that can sign in without an email link. Remove one if it is no longer trusted.
+                  </p>
+                </div>
+                {session && (
+                  <button
+                    type="button"
+                    onClick={() => void refreshPasskeys()}
+                    disabled={loadingPasskeys}
+                    className="self-start rounded-lg border border-line px-3 py-2 text-[11px] font-semibold text-text-muted transition-colors hover:border-line-strong hover:text-text disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {loadingPasskeys ? "Refreshing..." : "Refresh"}
+                  </button>
+                )}
+              </div>
+
+              {!session ? (
+                <div className="mt-4 rounded-lg border border-dashed border-line px-3 py-3 text-xs text-text-muted">
+                  Sign in with email first to view and manage passkeys for this account.
+                </div>
+              ) : loadingPasskeys ? (
+                <div className="mt-4 space-y-2" aria-label="Loading active passkeys">
+                  <div className="h-12 animate-pulse rounded-lg bg-surface" />
+                  <div className="h-12 animate-pulse rounded-lg bg-surface" />
+                </div>
+              ) : passkeyError ? (
+                <div className="mt-4 rounded-lg border border-rose-500/20 bg-rose-500/5 px-3 py-3 text-xs text-rose-300">
+                  {passkeyError}
+                </div>
+              ) : activePasskeys.length === 0 ? (
+                <div className="mt-4 rounded-lg border border-dashed border-line px-3 py-3 text-xs text-text-muted">
+                  No passkeys are registered yet. Register this device to make your next sign-in instant.
+                </div>
+              ) : (
+                <div className="mt-4 space-y-2">
+                  {activePasskeys.map((passkey) => (
+                    <div key={passkey.id} className="flex flex-col gap-3 rounded-lg border border-line bg-surface px-3 py-3 sm:flex-row sm:items-center sm:justify-between">
+                      <div className="flex min-w-0 items-center gap-3">
+                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-accent/10 text-accent">
+                          <Key size={15} weight="bold" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="truncate text-xs font-semibold text-text">{passkey.friendly_name || "Passkey device"}</p>
+                          <p className="mt-0.5 text-[11px] text-text-muted">
+                            Added {formatPasskeyDate(passkey.created_at)}
+                            {passkey.last_used_at ? ` · Last used ${formatPasskeyDate(passkey.last_used_at)}` : ""}
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          try {
+                            await deletePasskey(passkey.id);
+                            setActivePasskeys((current) => current.filter((item) => item.id !== passkey.id));
+                            toast.success("Passkey removed", "This device can no longer sign in with that passkey.");
+                          } catch (error) {
+                            toast.error("Could not remove passkey", error instanceof Error ? error.message : "Try again shortly.");
+                          }
+                        }}
+                        className="inline-flex shrink-0 items-center justify-center gap-1.5 self-start rounded-lg border border-line px-3 py-2 text-[11px] font-semibold text-text-muted transition-colors hover:border-rose-500/40 hover:text-rose-300 sm:self-auto"
+                      >
+                        <Trash size={14} />
+                        Remove
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             <div className="space-y-4 pt-2 divide-y divide-line">
@@ -303,4 +413,10 @@ export default function WorkspaceSettingsPage() {
       </form>
     </div>
   );
+}
+
+function formatPasskeyDate(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "recently";
+  return new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(date);
 }

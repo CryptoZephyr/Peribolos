@@ -13,7 +13,16 @@ type AuthContextValue = {
   signInWithWeb3: () => Promise<void>;
   signInWithPasskey: () => Promise<void>;
   registerPasskey: () => Promise<void>;
+  listPasskeys: () => Promise<ActivePasskey[]>;
+  deletePasskey: (passkeyId: string) => Promise<void>;
   signOut: () => Promise<void>;
+};
+
+export type ActivePasskey = {
+  id: string;
+  friendly_name?: string | null;
+  created_at: string;
+  last_used_at?: string | null;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -90,6 +99,17 @@ export function SupabaseAuthProvider({ children }: { children: ReactNode }) {
         throw new Error("Passkeys are not available in this browser. Use a secure, passkey-capable browser on a device with Windows Hello, Touch ID, or another passkey manager.");
       }
       const { error } = await supabase.auth.registerPasskey();
+      if (error) throw error;
+    },
+    listPasskeys: async () => {
+      if (!supabase) throw new Error("Supabase Auth is not configured for this dashboard.");
+      const { data, error } = await supabase.auth.passkey.list();
+      if (error) throw error;
+      return data ?? [];
+    },
+    deletePasskey: async (passkeyId) => {
+      if (!supabase) throw new Error("Supabase Auth is not configured for this dashboard.");
+      const { error } = await supabase.auth.passkey.delete({ passkeyId });
       if (error) throw error;
     },
     signOut: async () => {
