@@ -29,8 +29,12 @@ async function getSessionForRequest() {
 export async function fetchApi<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const url = `${API_BASE_URL}${endpoint}`;
   const apiKey = resolveApiKey();
-  const session = await getSessionForRequest();
-  const bearer = session?.access_token || apiKey;
+  // A saved management key identifies the workspace whose agents, vaults and
+  // audit history this browser is managing. Prefer it whenever present;
+  // otherwise a timing-dependent Supabase session refresh could silently send
+  // the same request to a different external workspace after a reload.
+  const session = apiKey ? null : await getSessionForRequest();
+  const bearer = apiKey || session?.access_token;
   const controller = new AbortController();
   const timeout = window.setTimeout(() => controller.abort(), 5_000);
   let res: Response;
