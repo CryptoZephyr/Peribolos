@@ -380,7 +380,7 @@ export default function AgentsPage() {
                       {vault?.mode === "live" ? (
                         <span className="text-emerald-400">● Arc Testnet Live</span>
                       ) : (
-                        <span className="text-amber-400">○ Policy Simulator</span>
+                        <span className="text-amber-400">○ Policy simulator (no funds)</span>
                       )}
                     </span>
                   </div>

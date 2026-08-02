@@ -295,7 +295,7 @@ export default function VaultsPage() {
                           : "bg-amber-500/15 text-amber-400 border border-amber-500/30"
                       }`}
                     >
-                      {vault.mode || "offline"}
+                      {vault.mode === "live" ? "live" : "policy simulator"}
                     </span>
                     {paused && (
                       <span className="rounded bg-rose-500/15 text-rose-400 border border-rose-500/30 px-2 py-0.5 text-[10px] font-bold uppercase">
