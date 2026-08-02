@@ -29,14 +29,14 @@ export function Hero() {
               href="/login"
               className="group flex items-center gap-2 rounded-lg bg-text px-6 py-3.5 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(16,24,40,0.14)] hover:bg-accent"
             >
-              Open app
+              Start with one protected payment
               <ArrowRight size={16} weight="bold" className="transition-transform group-hover:translate-x-0.5" />
             </Link>
             <a
-              href="#how"
+              href="#path"
               className="rounded-lg border border-line bg-surface-raised px-6 py-3.5 text-sm font-semibold text-text hover:border-line-strong hover:bg-surface"
             >
-              How it works
+              See the path
             </a>
           </div>
 

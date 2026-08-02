@@ -182,7 +182,7 @@ export default function LoginPage() {
 
           {/* Bottom Left Headline & Subtext */}
           <div className="relative z-10 max-w-md pt-6">
-            <h2 className="font-serif text-3xl font-normal tracking-tight text-slate-900 xl:text-4xl leading-[1.18]">
+            <h2 className="font-sans text-3xl font-semibold tracking-[-0.04em] text-slate-900 xl:text-4xl leading-[1.08]">
               One Click Away from Studio-Grade Security
             </h2>
             <p className="mt-2.5 text-xs sm:text-sm text-slate-500 leading-relaxed">
@@ -215,14 +215,23 @@ export default function LoginPage() {
           <div className="max-w-[400px] w-full mx-auto my-auto">
             {/* Form Header Title */}
             <div>
-              <h1 className="font-serif text-3xl sm:text-3xl font-medium tracking-tight text-slate-900">
-                {mode === "signup" ? "Create an Account" : "Welcome Back"}
+              <h1 className="font-sans text-3xl sm:text-3xl font-semibold tracking-[-0.04em] text-slate-900">
+                {mode === "signup" ? "Create an account" : "Welcome back"}
               </h1>
               <p className="mt-2 text-xs sm:text-sm text-slate-500 leading-relaxed">
                 {mode === "signup"
-                  ? "You are a few moments away from getting started!"
-                  : "Sign in to access your Peribolos agent vault workspace."}
+                  ? "Sign in, connect your owner wallet, and verify one protected payment."
+                  : "Return to your protected agent workspace."}
               </p>
+            </div>
+
+            <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-emerald-700">What happens next</p>
+              <ol className="mt-3 grid gap-2 text-xs text-slate-600 sm:grid-cols-3 lg:grid-cols-1">
+                <li className="flex gap-2"><span className="font-mono font-semibold text-slate-900">01</span><span>Sign in and register this device.</span></li>
+                <li className="flex gap-2"><span className="font-mono font-semibold text-slate-900">02</span><span>Connect Rabby and create your vault.</span></li>
+                <li className="flex gap-2"><span className="font-mono font-semibold text-slate-900">03</span><span>Run one small payment and keep the proof.</span></li>
+              </ol>
             </div>
 
             {/* Security updates checkbox (matching reference design) */}

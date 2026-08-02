@@ -83,7 +83,7 @@ export function PaymentRequestPanel() {
   }
 
   return (
-    <section className="app-panel overflow-hidden">
+    <section id="payment-test" className="app-panel scroll-mt-24 overflow-hidden">
       <div className="flex flex-col gap-4 border-b border-line bg-surface px-5 py-5 sm:flex-row sm:items-start sm:justify-between sm:px-6">
         <div>
           <p className="eyebrow">Agent test lane</p>

@@ -1,6 +1,7 @@
 import { Nav } from "./components/landing/Nav";
 import { Hero } from "./components/landing/Hero";
 import { Ecosystem } from "./components/landing/Ecosystem";
+import { ActivationPath } from "./components/landing/ActivationPath";
 import { ArcSignals } from "./components/landing/ArcSignals";
 import { ProductPreview } from "./components/landing/ProductPreview";
 import { Problem } from "./components/landing/Problem";
@@ -17,6 +18,7 @@ export default function Home() {
       <main>
         <Hero />
         <Ecosystem />
+        <ActivationPath />
         <ArcSignals />
         <ProductPreview />
         <Problem />

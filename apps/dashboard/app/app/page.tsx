@@ -24,7 +24,8 @@ export default function DashboardOverviewPage() {
     hasVault: false,
     hasPayee: false,
     hasApiKey: false,
-    hasSimulationRun: false,
+    hasExecutedPayment: false,
+    hasActivity: false,
   });
 
   const [paymentRequests, setPaymentRequests] = useState<any[]>([]);
@@ -41,10 +42,9 @@ export default function DashboardOverviewPage() {
           fetchApi<any>('/v1/activity'),
           fetchApi<any>('/v1/agents'),
           fetchApi<any>('/v1/payees'),
-          fetchApi<any>('/v1/api-keys'),
           fetchApi<any>('/v1/vaults'),
         ]);
-        const [activityResult, agentsResult, payeesResult, keysResult, vaultsResult] = results;
+        const [activityResult, agentsResult, payeesResult, vaultsResult] = results;
         const failed = results.filter((result) => result.status === 'rejected').length;
         if (failed === results.length) {
           setLoadError('We could not reach this workspace. Your data has not been deleted; check the API key or connection and try again.');
@@ -55,7 +55,6 @@ export default function DashboardOverviewPage() {
         const activity = activityResult.status === 'fulfilled' ? activityResult.value : { paymentRequests: [] };
         const agents = agentsResult.status === 'fulfilled' ? agentsResult.value : [];
         const payees = payeesResult.status === 'fulfilled' ? payeesResult.value : [];
-        const keys = keysResult.status === 'fulfilled' ? keysResult.value : [];
         const vaults = vaultsResult.status === 'fulfilled' ? vaultsResult.value : [];
 
         const prs = activity?.paymentRequests || [];
@@ -63,17 +62,20 @@ export default function DashboardOverviewPage() {
         const blocked = prs.filter((pr: any) => pr.status === 'BLOCKED').length;
 
         const hasAgent = Array.isArray(agents) && agents.length > 0;
-        const hasVault = Array.isArray(vaults) && vaults.length > 0;
+        const hasVault = Array.isArray(vaults) && vaults.some((vault: any) => vault.mode === 'live');
         const hasPayee = Array.isArray(payees) && payees.length > 0;
-        const hasApiKey = Array.isArray(keys) && keys.length > 0;
-        const hasSimulationRun = prs.length > 0;
+        const hasBrowserApiKey = typeof window !== 'undefined' && Boolean(window.localStorage.getItem('peribolos.apiKey.v1'));
+        const hasApiKey = hasBrowserApiKey || Boolean(process.env.NEXT_PUBLIC_PERIBOLOS_API_KEY);
+        const hasExecutedPayment = prs.some((pr: any) => pr.status === 'EXECUTED');
+        const hasActivity = prs.length > 0;
 
         setOnboardingState({
           hasAgent,
           hasVault,
           hasPayee,
           hasApiKey,
-          hasSimulationRun,
+          hasExecutedPayment,
+          hasActivity,
         });
 
         setStats({
@@ -107,9 +109,9 @@ export default function DashboardOverviewPage() {
       <div className="flex flex-col gap-5 border-b border-line pb-7 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="eyebrow">Workspace overview</p>
-          <h1 className="mt-2 text-3xl font-semibold tracking-[-0.04em] text-text">Platform overview</h1>
+          <h1 className="mt-2 text-3xl font-semibold tracking-[-0.04em] text-text">{setupComplete ? "Workspace ready" : "Protect your first agent"}</h1>
           <p className="mt-2 max-w-xl text-sm leading-6 text-text-muted">
-            See what your agents can spend, the rules that contain them, and every decision those rules made.
+            {setupComplete ? "Your agent, vault, payee, and audit proof are connected. Review the controls or keep operating." : "Follow the activation path to connect an agent, put a live vault around it, and verify one policy-bound payment."}
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -140,6 +142,8 @@ export default function DashboardOverviewPage() {
       {!loadError && loadWarning && (
         <div role="status" className="rounded-xl border border-amber-500/25 bg-amber-500/5 px-4 py-3 text-xs text-amber-200">{loadWarning}</div>
       )}
+
+      {!loading && <OnboardingWizard state={onboardingState} />}
 
       {loading ? (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
@@ -181,8 +185,6 @@ export default function DashboardOverviewPage() {
           </div>
         </section>
       )}
-
-      {!setupComplete && <OnboardingWizard state={onboardingState} />}
 
       <PaymentRequestPanel />
 
