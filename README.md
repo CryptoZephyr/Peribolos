@@ -1,268 +1,219 @@
-# Peribolos V2
+# Peribolos
 
-> Non-custodial, rule-enforced USDC spending vaults and managed payment API for autonomous AI agents on [Arc](https://docs.arc.network).
+Peribolos gives autonomous AI agents a bounded way to spend USDC on Arc. An operator defines the rules, the agent receives a scoped API key, and the vault contract checks every payment before funds move.
 
-[![Arc Network](https://img.shields.io/badge/Network-Arc%20Testnet%20(5042002)-6366f1?style=for-the-badge&logo=ethereum)](https://testnet.arcscan.app)
-[![API Status](https://img.shields.io/badge/API-Live%20on%20Render-emerald?style=for-the-badge&logo=render)](https://peribolos-api.onrender.com/health)
-[![USDC Native](https://img.shields.io/badge/Gas-USDC%20Native-2775CA?style=for-the-badge&logo=usdc)](https://testnet.arcscan.app/address/0x3600000000000000000000000000000000000000)
-[![License](https://img.shields.io/badge/License-MIT-blue?style=for-the-badge)](LICENSE)
+This repository contains the Arc testnet contracts, hosted payment API, web control room, and SDK packages used to integrate agent runtimes.
 
-Peribolos provides on-chain spending controls and a payment API for AI agents. Smart contracts on Arc L1 enforce spending limits, payee allowlists, and permitted action types. A web control room and managed signer service let operators manage agent budgets, monitor audit logs, and simulate prompt injection attacks without giving agents direct access to private keys.
+## Current status
 
----
+- Network: [Arc Testnet](https://docs.arc.network), chain `5042002`
+- Control room: [peribolos.vercel.app](https://peribolos.vercel.app)
+- API: [peribolos-api.onrender.com](https://peribolos-api.onrender.com)
+- API health: [peribolos-api.onrender.com/health](https://peribolos-api.onrender.com/health)
+- License: [MIT](LICENSE)
 
-## Quick Links
+Peribolos is a testnet product. Do not use production funds until deployment secrets, signer controls, and contract operations have been reviewed for your environment.
 
-- **Live Backend API**: [https://peribolos-api.onrender.com](https://peribolos-api.onrender.com/health)
-- **Local Control Room**: `http://localhost:3000`
-- **Architecture Specification**: [architecture.md](architecture.md)
-- **Product Specification**: [Peribolos_Product_Spec-3.md](Peribolos_Product_Spec-3.md)
+## What it protects
 
----
+The spending boundary lives outside the agent runtime:
 
-## Core Capabilities
+1. An operator creates an agent and gives it a payment API key.
+2. The agent submits a payment request to the API.
+3. The API checks the vault, payee, action type, pause state, and spending caps.
+4. A managed signer submits `vault.pay` when the vault is live.
+5. The Arc contract enforces the same authorization rules on-chain.
+6. The API records the result and exposes it through activity and audit routes.
 
-| Component | Details |
+Offline vaults are reported as `FAILED`; the API never invents a transaction hash or claims a payment executed when it did not.
+
+## Main pieces
+
+| Area | Location | Responsibility |
+|---|---|---|
+| Web control room | `apps/dashboard` | Agent, vault, payee, policy, signer, activity, and simulation screens |
+| Hosted API | `apps/api` | Authentication, policy checks, payments, signer orchestration, persistence, and audit export |
+| Contracts | `contracts` | Vault ownership, caps, pause, allowlists, and payment enforcement |
+| Core SDK | `sdk/core` | TypeScript client for the hosted API and on-chain vaults |
+| LangChain SDK | `sdk/langchain` | LangChain tools backed by the payment API |
+| Demo services | `apps/demo-agent`, `apps/demo-seller` | Local examples for agent calls and x402-style seller flows |
+
+## Dashboard features
+
+The hosted control room supports:
+
+- Email-link, Web3 wallet, and Supabase passkey sign-in
+- Passkey registration, active-device review, refresh, and removal from Settings
+- Account logout that clears the Supabase session, connected wallet state, and local API-key state
+- Agent provisioning and scoped API-key generation
+- Vault caps, payee allowlists, action types, expiry, and pause controls
+- Activity and audit review
+- Prompt-injection simulations against the same policy preflight used by payments
+
+## Arc testnet
+
+| Resource | Value |
 |---|---|
-| **Web Control Room** | Next.js 16 app for agent provisioning, vault configuration, payee allowlists, daily budgets, and API key generation. |
-| **Managed Signer** | Server-side AES-256-GCM key isolation. Agents use API keys (`pb_live_...`) instead of raw private keys. |
-| **Payment API** | Express 4.21 backend (`POST /v1/payments`) with Bearer token authentication, SHA-256 key hashing, idempotency, and policy checks. |
-| **On-Chain Enforcement** | Arc L1 smart contracts (`PeribolosVault.sol`) enforce per-transaction caps, daily velocity limits, action bitmasks, and payee allowlists. |
-| **ERC-8004 Identity** | On-chain registration of AI Agent Identity NFTs during domain creation. |
-| **Gasless x402 Support** | Circle Gateway Nanopayments support for petty-cash microtransactions (`peribolos_buy`). |
-| **Adversarial Laboratory** | In-dashboard prompt injection simulator testing agent attacks against smart contract boundaries. |
-| **SDK Ecosystem** | Native packages for TypeScript (`@peribolos/core`), LangChain (`@peribolos/langchain`), OpenAI Agents SDK, and Python / CrewAI. |
-| **Audit & Export** | Event indexer with JSON and CSV export endpoints (`/v1/audit/export`). |
+| Chain ID | `5042002` (`0x4CEF52`) |
+| RPC | `https://rpc.testnet.arc.network` |
+| Explorer | [testnet.arcscan.app](https://testnet.arcscan.app) |
+| Native USDC | `0x3600000000000000000000000000000000000000` |
+| Identity registry | [`0x8004A818BFB912233c491871b3d84c89A494BD9e`](https://testnet.arcscan.app/address/0x8004A818BFB912233c491871b3d84c89a494bd9e) |
+| Peribolos factory | [`0x84B6a05B1d71D5947Adf1438c6FFe8Eb66AdA31E`](https://testnet.arcscan.app/address/0x84b6a05b1d71d5947adf1438c6ffe8eb66ada31e) |
+| Sample vault | [`0xac5d542EdCB15972570685B2Fdb87be71d1378a1`](https://testnet.arcscan.app/address/0xac5d542edcb15972570685b2fdb87be71d1378a1) |
 
----
+## Run locally
 
-## Architecture
+### Requirements
 
-```mermaid
-flowchart TD
-    subgraph Agent Environment
-        A[AI Agent / LLM] -->|1. Request payment via Bearer key| B[Peribolos API]
-    end
+- Node.js 20 or newer
+- npm
+- Foundry, if you plan to work on the contracts
 
-    subgraph Managed Infrastructure
-        B -->|2. Policy preflight check| C[Managed Signer Service]
-        C -->|3. Sign & submit transaction| D[Arc L1 Blockchain]
-    end
-
-    subgraph Arc Blockchain - Chain ID 5042002
-        D -->|4. Enforce rules| E[Peribolos Vault Contract]
-        E -->|5. Transfer native USDC| F[Approved Payee]
-    end
-```
-
-### Deployed Contracts & Network Specification
-
-| Resource | Value / Address |
-|---|---|
-| **Blockchain Network** | Arc Testnet (`Chain ID: 5042002 / 0x4CEF52`) |
-| **RPC Endpoint** | `https://rpc.testnet.arc.network` |
-| **Block Explorer** | [testnet.arcscan.app](https://testnet.arcscan.app) |
-| **Native USDC Asset** | `0x3600000000000000000000000000000000000000` (6 decimals, native gas asset) |
-| **Peribolos Factory** | [`0x84B6a05B1d71D5947Adf1438c6FFe8Eb66AdA31E`](https://testnet.arcscan.app/address/0x84b6a05b1d71d5947adf1438c6ffe8eb66ada31e) |
-| **Sample Vault** | [`0xac5d542EdCB15972570685B2Fdb87be71d1378a1`](https://testnet.arcscan.app/address/0xac5d542edcb15972570685b2fdb87be71d1378a1) |
-| **Hosted Backend API** | `https://peribolos-api.onrender.com` |
-
----
-
-## Setup and Development
-
-### Prerequisites
-
-- Node.js >= 20
-- Foundry / Forge (for smart contract testing)
-
-### Installation & Execution
+### Install
 
 ```bash
 git clone https://github.com/CryptoZephyr/Peribolos.git
 cd Peribolos
-
-# Install dependencies and build SDK packages
 npm install
 npm run build:sdk
+```
 
-# Option A: Start individual components
-npm run dev:api         # Express API & indexer on Port 3400
-npm run dev:dashboard   # Next.js control room on Port 3000
-npm run dev:seller      # Demo x402 seller API
+Create local `.env` and `.env.local` files as needed. They are intentionally not committed. The API uses Circle credentials for hosted signer provisioning and Supabase credentials for production persistence. The dashboard uses the public Supabase URL and anon key.
 
-# Option B: Run full stack via script runner
+### Start the stack
+
+```bash
+npm run dev:api         # API on port 3400
+npm run dev:dashboard   # dashboard on port 3000
+npm run dev:seller      # optional x402 seller on port 3402
+```
+
+Or start the local stack runner:
+
+```bash
 npm run dev:stack
 ```
 
----
+## Payment API
 
-## Workflow Guide
-
-1. **Create an agent**: Open **Agents** and click **Provision New Agent**. This creates the agent record, provisions a Circle Developer-Controlled Wallet signer, creates an offline vault placeholder, and returns an agent payment key (`pb_live_...`).
-2. **Deploy the live vault**: Open **Vaults**, connect the owner wallet or passkey on Arc Testnet, paste the managed signer address, configure the allowlist/caps, and submit the owner deployment transaction. The API will only accept the resulting address after verifying Arc bytecode and the vault's on-chain `agentKey`.
-3. **Configure payees and policy**: Add vendor addresses under **Payees**, then review daily caps, per-transaction limits, and action types under **Vaults**. The contract is the final authority.
-4. **Fund and verify**: Fund the vault with Arc-native USDC. The vault page reads the authoritative ERC-20 balance from Arc; recorded transaction notes are not treated as proof of funding.
-5. **Execute payments**: Pass the agent payment key to your runtime and call `POST /v1/payments`. Agents can request `vault.pay`; only the on-chain vault can authorize and transfer USDC.
-6. **Run security simulations**: Open **Simulations** to test prompt-injection payloads against the same policy preflight used by the payment API.
-
-### Workspace keys and roles
-
-Peribolos separates operator control from agent execution:
-
-- **Agent keys** are payment credentials for runtimes. They can submit payment requests but cannot create agents, change vault configuration, rotate signers, manage payees, or issue keys.
-- **Operator keys** are workspace-management credentials for startup operators and Web3 operations teams. They can manage agents, vaults, payees, signers, and workspace keys.
-
-Create and review both key types under **API Keys**. Never place an operator key in an agent environment.
-
-For a live vault, signer rotation is two-phase: an operator prepares a pending signer, the vault owner authorizes `rotateAgentKey` on Arc, and the API confirms the new on-chain key before activating it.
-
----
-
-## Payment API Reference
-
-### `POST /v1/payments`
-
-Submits a payment request using an agent's API key.
-
-#### Request Example
+Agent payments use a Bearer API key. The raw key is shown once and only its hash is stored.
 
 ```bash
 curl -X POST https://peribolos-api.onrender.com/v1/payments \
   -H "Content-Type: application/json" \
-  -H "Authorization: Bearer pb_live_demo1234567890abcdef1234567890abcdef" \
+  -H "Authorization: Bearer $PERIBOLOS_AGENT_API_KEY" \
+  -H "Idempotency-Key: $REQUEST_ID" \
   -d '{
-    "payeeAddress": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+    "payeeAddress": "'"$PAYEE_ADDRESS"'",
     "amountUsdc": 2.50,
     "actionType": 1,
-    "idempotencyKey": "idemp_req_001"
+    "idempotencyKey": "'"$REQUEST_ID"'"
   }'
 ```
 
-#### Successful Execution (`200 OK`)
+| Route | Purpose |
+|---|---|
+| `GET /health` | Process liveness and network metadata |
+| `GET /ready` | Production signer and persistence readiness |
+| `POST /v1/payments` | Submit an agent payment |
+| `GET /v1/payments/:id` | Read a payment result |
+| `GET /v1/activity` | Workspace-scoped activity |
+| `GET /v1/audit/export` | CSV or JSON audit export |
+| `GET /v1/setup/status` | Operator-only signer and network readiness |
+| `GET /v1/signers/status` | Operator-only signer-to-vault linkage |
 
-`EXECUTED` is returned only after a live vault transaction is mined and a `PaymentExecuted` event is observed. Offline vaults return `FAILED` with `OFFLINE_VAULT`; they never fabricate transaction hashes.
+Payment responses use explicit states:
 
-```json
-{
-  "id": "pr_abc123",
-  "idempotencyKey": "idemp_req_001",
-  "status": "EXECUTED",
-  "amountUsdc": 2.50,
-  "payeeAddress": "0x70997970c51812dc3a010c7d01b50e0d17dc79c8",
-  "payeeName": "Demo x402 Seller API",
-  "txHash": "0x8f2a...",
-  "explorerUrl": "https://testnet.arcscan.app/tx/0x8f2a..."
-}
-```
+- `EXECUTED`: the chain transaction completed and has a transaction hash.
+- `BLOCKED`: policy or contract authorization rejected the request.
+- `FAILED`: execution could not complete; no successful chain claim is made.
+- `PENDING`: a live transaction is still being processed.
 
-#### Policy Violation Response (`403 Forbidden`)
+## SDK example
 
-```json
-{
-  "id": "pr_xyz789",
-  "status": "BLOCKED",
-  "blockReasonCode": "RECIPIENT_NOT_ALLOWLISTED",
-  "blockReasonDescription": "Address 0x1111... is not registered in the payee allowlist.",
-  "explorerUrl": "https://testnet.arcscan.app/address/0x1111..."
-}
-```
+```ts
+import { PeribolosHostedClient } from "@peribolos/core";
 
----
-
-## Developer Integrations
-
-### 1. TypeScript Core SDK (`@peribolos/core`)
-
-```typescript
-import { PeribolosHostedClient, PeribolosVaultClient } from "@peribolos/core";
-
-// Hosted API Client
-const hostedClient = new PeribolosHostedClient({
+const client = new PeribolosHostedClient({
   apiKey: process.env.PERIBOLOS_API_KEY!,
-  baseUrl: "https://peribolos-api.onrender.com"
+  baseUrl: "https://peribolos-api.onrender.com",
 });
 
-const response = await hostedClient.pay({
-  payeeAddress: "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
-  amountUsdc: 2.50,
-  actionType: 1
+const result = await client.pay({
+  payeeAddress: process.env.PAYEE_ADDRESS as `0x${string}`,
+  amountUsdc: 2.5,
+  actionType: 1,
 });
 
-console.log(`Payment Status: ${response.status}, TX: ${response.txHash}`);
+console.log(result.status, result.txHash);
 ```
 
-### 2. LangChain Integration (`@peribolos/langchain`)
+For LangChain integrations, use `createPeribolosTools` from `@peribolos/langchain` with the same API key and API base URL.
 
-```typescript
-import { createPeribolosTools } from "@peribolos/langchain";
+## Production configuration
 
-// Instantiates peribolos_pay, peribolos_buy, and peribolos_status tools
-const tools = createPeribolosTools({
-  apiKey: process.env.PERIBOLOS_API_KEY!,
-  baseUrl: "https://peribolos-api.onrender.com"
-});
-```
+Render provides the API process and Vercel provides the dashboard. Secrets are configured in those platforms, never committed to the repository.
 
-### 3. Executable Demos
+Production API configuration includes:
+
+- `CIRCLE_API_KEY`
+- `ENTITY_SECRET` or `CIRCLE_ENTITY_SECRET`
+- `CIRCLE_WALLET_SET_ID`
+- `SIGNER_ENCRYPTION_KEY`
+- `SUPABASE_URL` and `SUPABASE_ANON_KEY` (or the `NEXT_PUBLIC_*` equivalents)
+- `SUPABASE_SERVICE_ROLE_KEY` for server-only state persistence
+- `CORS_ORIGIN`
+
+Run `apps/api/src/db/schema.sql` in the Supabase SQL editor before the first production start. The API stores its current state snapshot in the locked-down `peribolos_state` table. The service-role key is used only by the API and must never be exposed to the dashboard.
+
+For passkeys, configure Supabase Authentication → Passkeys with the production relying-party ID and origin for `peribolos.vercel.app`.
+
+## Security model
+
+| Risk | Control |
+|---|---|
+| Prompt injection requests an unsafe payment | Policy preflight plus on-chain vault checks |
+| Agent receives a private key | Agent receives an API key; signing remains in the managed signer service |
+| Agent exceeds a budget | Per-transaction and daily caps are checked before payment and enforced by the vault |
+| Agent pays an unknown recipient | Payee allowlists are checked before execution and by the contract |
+| Duplicate request retries | Idempotency keys return the existing payment record |
+| Operator and agent permissions are mixed | Management routes require operator credentials; payment keys are agent-scoped |
+
+## Tests and checks
 
 ```bash
-# Scripted deterministic prompt injection demo on Arc testnet
-npm run demo
-
-# LLM agent prompt injection demo with LangChain
-npm run demo:llm
-```
-
----
-
-## Security Matrix
-
-| Vulnerability Vector | Soft LLM Guardrails | Peribolos Vault Contracts |
-|---|---|---|
-| **Prompt Injection** | Vulnerable to jailbreaks and system prompt overrides | Immune. Rules execute on-chain on Arc L1. |
-| **Private Key Exposure** | Keys stored in environment variables or agent context | Isolated. Managed Signer handles signing server-side. |
-| **Overspending** | Agent can hallucinate transaction values | Enforced. Per-tx caps and daily velocity limits in contract. |
-| **Unauthorized Payee** | Agent can send funds to arbitrary recipient addresses | Enforced. Contract rejects addresses outside allowlist. |
-
----
-
-## Testing & Quality Assurance
-
-```bash
-# 1. Smart Contract Test Suite (68 local tests + 1 Arc testnet fork test)
-cd contracts && forge test
-
-# 2. SDK Unit Tests
-npm test -w @peribolos/core
-
-# 3. API Integration Tests
-npm test -w @peribolos/api
-
-# 4. Workspace Typecheck across all packages
 npm run typecheck
+npm run build
+npm run test -w @peribolos/api
+
+cd contracts
+forge test
 ```
 
----
-
-## Repository Structure
+## Repository layout
 
 ```text
 Peribolos/
 ├── apps/
-│   ├── api/          # Express backend API & managed signer service
-│   ├── dashboard/    # Next.js 15 control room UI
-│   ├── demo-agent/   # Scripted and LLM demo agents
-│   └── demo-seller/  # x402 seller API using Circle Gateway
-├── contracts/        # Foundry EVM smart contracts (PeribolosVault, PeribolosFactory)
+│   ├── api/          # Express API, policy layer, signer service, and indexer
+│   ├── dashboard/    # Next.js control room
+│   ├── demo-agent/   # Local scripted and LLM agent examples
+│   └── demo-seller/  # Local seller example
+├── contracts/        # PeribolosVault and PeribolosFactory contracts
 ├── sdk/
-│   ├── core/         # @peribolos/core (TypeScript RPC & API client)
-│   └── langchain/    # @peribolos/langchain (LangChain agent tools)
-├── scripts/          # Workspace automation scripts (dev-stack, demo-full, preflight)
-└── render.yaml       # Infrastructure setup declaration
+│   ├── core/         # @peribolos/core
+│   └── langchain/    # @peribolos/langchain
+├── scripts/          # Local stack, demo, and preflight helpers
+├── architecture.md   # System architecture notes
+└── render.yaml       # Render service definition
 ```
 
----
+## Further reading
+
+- [Architecture notes](architecture.md)
+- [Arc documentation](https://docs.arc.network)
+- [Arc testnet explorer](https://testnet.arcscan.app)
 
 ## License
 
