@@ -174,8 +174,8 @@ export default function DashboardOverviewPage() {
         ) : (
           <div className="divide-y divide-line">
             {paymentRequests.slice(0, 5).map((pr: any) => (
-              <div key={pr.id} className="py-3 flex items-center justify-between text-xs">
-                <div className="flex items-center gap-3">
+              <div key={pr.id} className="flex flex-col gap-3 py-3 text-xs sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex min-w-0 items-center gap-3">
                   <span className={`px-2 py-0.5 rounded font-mono text-[10px] font-bold ${
                     pr.status === 'EXECUTED' ? 'border border-accent/20 bg-accent-tint text-accent' :
                     pr.status === 'BLOCKED' ? 'border border-blocked/20 bg-blocked-tint text-blocked' :
@@ -183,12 +183,12 @@ export default function DashboardOverviewPage() {
                   }`}>
                     {pr.status}
                   </span>
-                  <div>
-                    <span className="font-medium text-text">{pr.payeeName || pr.payeeAddress}</span>
+                  <div className="min-w-0">
+                    <span className="block truncate font-medium text-text" title={pr.payeeName || pr.payeeAddress}>{pr.payeeName || pr.payeeAddress}</span>
                     <p className="text-[11px] text-text-muted">{new Date(pr.createdAt).toLocaleString()}</p>
                   </div>
                 </div>
-                <div className="text-right flex items-center gap-3">
+                <div className="flex w-full items-center justify-between gap-3 text-right sm:w-auto sm:justify-end">
                   {pr.txHash && <ExplorerBadge type="tx" hashOrAddress={pr.txHash} />}
                   <div>
                     <span className="font-mono font-semibold text-text">${pr.amountUsdc.toFixed(2)} USDC</span>

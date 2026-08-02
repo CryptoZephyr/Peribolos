@@ -15,14 +15,16 @@ export default function AppLayout({ children }: { children: ReactNode }) {
         <header className="sticky top-0 z-40 border-b border-line bg-surface-raised/90 backdrop-blur md:hidden">
           <div className="flex items-center justify-between px-4 py-3">
             <Link href="/" aria-label="Peribolos home"><PeribolosLogo size={25} showBadge={false} /></Link>
-            <div className="flex items-center gap-2">
-              <ApiKeySetup />
-              <details className="relative">
+            <details className="relative">
                 <summary aria-label="Open workspace navigation" className="flex h-9 cursor-pointer list-none items-center justify-center rounded-lg border border-line bg-surface-raised px-2 text-xs font-semibold text-text-muted hover:bg-surface hover:text-text [&::-webkit-details-marker]:hidden">Menu</summary>
-                <div className="absolute right-0 top-12 z-50 w-[276px] rounded-xl border border-line bg-surface-raised p-4 shadow-[0_20px_56px_rgba(16,24,40,0.18)]"><SidebarNav /></div>
-              </details>
-              <ConnectButton />
-            </div>
+                <div className="absolute right-0 top-12 z-50 w-[min(276px,calc(100vw-2rem))] rounded-xl border border-line bg-surface-raised p-4 shadow-[0_20px_56px_rgba(16,24,40,0.18)]">
+                  <div className="mb-3 flex flex-wrap items-center justify-between gap-2 border-b border-line pb-3">
+                    <ApiKeySetup />
+                    <ConnectButton />
+                  </div>
+                  <SidebarNav />
+                </div>
+            </details>
           </div>
         </header>
 

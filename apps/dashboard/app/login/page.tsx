@@ -96,7 +96,7 @@ export default function LoginPage() {
   return (
     <main className="min-h-[100dvh] bg-[#eef0f3] p-4 sm:p-6 lg:p-10 flex items-center justify-center font-sans antialiased">
       {/* Main Split-Card Container */}
-      <div className="w-full max-w-[1140px] bg-white rounded-[32px] overflow-hidden border border-slate-200/80 shadow-[0_24px_70px_rgba(15,23,42,0.08)] grid grid-cols-1 lg:grid-cols-12 min-h-[680px]">
+      <div className="w-full max-w-[1140px] bg-white rounded-[32px] overflow-hidden border border-slate-200/80 shadow-[0_24px_70px_rgba(15,23,42,0.08)] grid grid-cols-1 lg:grid-cols-12 lg:min-h-[680px]">
         
         {/* LEFT PANEL - Visual Showcase & Interactive Policy Card (Matching reference design) */}
         <section className="relative hidden lg:flex lg:col-span-6 flex-col justify-between bg-[#f5f7fa] p-10 xl:p-12 border-r border-slate-100/90 overflow-hidden select-none">
@@ -192,7 +192,7 @@ export default function LoginPage() {
         </section>
 
         {/* RIGHT PANEL - Clean Sign In / Register Form Panel */}
-        <section className="col-span-1 lg:col-span-6 p-8 sm:p-12 xl:p-14 flex flex-col justify-between bg-white">
+        <section className="col-span-1 lg:col-span-6 p-6 sm:p-12 xl:p-14 flex flex-col justify-between bg-white">
           
           {/* Mobile Header */}
           <header className="flex items-center justify-between lg:hidden mb-8">
@@ -203,6 +203,14 @@ export default function LoginPage() {
               Back home
             </Link>
           </header>
+
+          <div className="mb-6 flex items-start gap-3 rounded-2xl border border-emerald-200/70 bg-emerald-50/70 p-4 lg:hidden">
+            <ShieldCheck size={18} weight="bold" className="mt-0.5 shrink-0 text-emerald-700" />
+            <div>
+              <p className="text-xs font-semibold text-emerald-900">Contract-enforced spending</p>
+              <p className="mt-1 text-[11px] leading-relaxed text-emerald-800/80">Protect agent payments on Arc Testnet with rules that run before funds move.</p>
+            </div>
+          </div>
 
           <div className="max-w-[400px] w-full mx-auto my-auto">
             {/* Form Header Title */}
@@ -348,7 +356,7 @@ export default function LoginPage() {
             )}
 
             {/* Live Demo Link */}
-            <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between">
+            <div className="mt-6 flex flex-col items-start gap-2 border-t border-slate-100 pt-4 sm:flex-row sm:items-center sm:justify-between">
               <span className="text-[11px] text-slate-400">Want to test without signing up?</span>
               <Link
                 href="/app?demo=1"
