@@ -8,14 +8,26 @@ import { db } from './db/store.js';
 const app = express();
 const PORT = process.env.PORT || 3400;
 
-// CORS: restrict to dashboard origin in production, allow all in dev/test
-const allowedOrigins = process.env.CORS_ORIGIN
-  ? process.env.CORS_ORIGIN.split(',')
-  : ['http://localhost:3000', 'http://localhost:3001'];
+// CORS: restrict browser access to explicitly trusted origins in production.
+// A wildcard is intentionally ignored in production because credentialed
+// requests cannot use `Access-Control-Allow-Origin: *` safely.
+const configuredOrigins = (process.env.CORS_ORIGIN ?? '')
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+const allowedOrigins = process.env.NODE_ENV === 'production'
+  ? (configuredOrigins.filter((origin) => origin !== '*').length > 0
+      ? configuredOrigins.filter((origin) => origin !== '*')
+      : ['https://peribolos.vercel.app'])
+  : configuredOrigins.length > 0
+    ? configuredOrigins
+    : ['http://localhost:3000', 'http://localhost:3001'];
 
 app.use(cors({
   origin: process.env.NODE_ENV === 'production'
-    ? allowedOrigins
+    ? (requestOrigin, callback) => {
+        callback(null, !requestOrigin || allowedOrigins.includes(requestOrigin));
+      }
     : true, // Allow all in dev for convenience
   credentials: true,
   methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],

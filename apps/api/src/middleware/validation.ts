@@ -1,8 +1,17 @@
 import { Request, Response, NextFunction } from 'express';
 import { z, ZodError } from 'zod';
+import { parseUnits } from 'viem';
 
 const ethereumAddressRegex = /^0x[0-9a-fA-F]{40}$/;
 const txHashRegex = /^0x[0-9a-fA-F]{64}$/;
+
+/** Convert a validated USDC amount into the token's six-decimal base units. */
+export function usdcAmountToUnits(amountUsdc: number): bigint {
+  if (!Number.isFinite(amountUsdc) || amountUsdc <= 0) {
+    throw new Error('amountUsdc must be a positive finite number');
+  }
+  return parseUnits(amountUsdc.toFixed(6), 6);
+}
 
 export const paymentSchema = z.object({
   payeeAddress: z.string().regex(ethereumAddressRegex, {
@@ -10,6 +19,8 @@ export const paymentSchema = z.object({
   }),
   amountUsdc: z.number().positive({
     message: 'amountUsdc must be a positive number.'
+  }).refine((amount) => Number.isInteger(amount * 1_000_000), {
+    message: 'amountUsdc must use no more than 6 decimal places.'
   }),
   actionType: z.number().int().min(0).max(255).optional().default(1),
   idempotencyKey: z.string().min(1).optional(),

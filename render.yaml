@@ -20,7 +20,7 @@ services:
       - key: SIGNER_ENCRYPTION_KEY
         generateValue: true
       - key: CORS_ORIGIN
-        value: "*"
+        value: https://peribolos.vercel.app
     # Persistent disks require a paid plan on Render (Starter or above).
     # Uncomment below if deploying on a paid instance:
     # disk:
