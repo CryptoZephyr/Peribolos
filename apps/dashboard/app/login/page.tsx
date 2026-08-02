@@ -355,16 +355,6 @@ export default function LoginPage() {
               </p>
             )}
 
-            {/* Live Demo Link */}
-            <div className="mt-6 flex flex-col items-start gap-2 border-t border-slate-100 pt-4 sm:flex-row sm:items-center sm:justify-between">
-              <span className="text-[11px] text-slate-400">Want to test without signing up?</span>
-              <Link
-                href="/app?demo=1"
-                className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-700 hover:text-emerald-800 hover:underline"
-              >
-                View Live Demo <ArrowRight size={13} weight="bold" />
-              </Link>
-            </div>
           </div>
 
           {/* Footer note */}
