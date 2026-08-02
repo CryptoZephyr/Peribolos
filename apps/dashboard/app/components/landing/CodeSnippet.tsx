@@ -3,8 +3,8 @@ import { Reveal } from "./Reveal";
 const SNIPPET = `import { createPeribolosTools } from "@peribolos/langchain";
 
 const tools = createPeribolosTools({
-  vaultAddress: "0x62D5487d...9BbC7B",
-  // Primary path: PERIBOLOS_API_KEY (pb_live_...) — agent private keys stay server-side
+  vaultAddress: process.env.PERIBOLOS_VAULT_ADDRESS,
+  // Primary path: PERIBOLOS_API_KEY (pb_live_...) keeps agent private keys server-side
   apiKey: process.env.PERIBOLOS_API_KEY,
 });
 

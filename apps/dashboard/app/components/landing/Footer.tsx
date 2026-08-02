@@ -16,17 +16,11 @@ export function Footer() {
           >
             Factory contract
           </a>
-          <Link href="/docs" className="transition-colors hover:text-text">
-            SDK docs
-          </Link>
-          <Link href="/education" className="transition-colors hover:text-text">
-            Education Center
-          </Link>
-          <Link href="/privacy" className="transition-colors hover:text-text">
-            Privacy Policy
-          </Link>
-          <Link href="/terms" className="transition-colors hover:text-text">
-            Terms of Service
+          <a href="https://docs.arc.network" target="_blank" rel="noreferrer" className="transition-colors hover:text-text">
+            Arc docs
+          </a>
+          <Link href="/login" className="transition-colors hover:text-text">
+            Open workspace
           </Link>
           <span className="text-text-muted">Built on Arc testnet</span>
         </div>

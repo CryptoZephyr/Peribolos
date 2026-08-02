@@ -50,8 +50,8 @@ export function ApiKeySetup() {
       </button>
 
       {open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-          <div className="w-full max-w-md rounded-xl border border-line bg-surface-raised p-6 shadow-2xl">
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/60 p-4 sm:items-center sm:p-6">
+          <div className="my-auto max-h-[calc(100dvh-2rem)] w-full max-w-md overflow-y-auto rounded-xl border border-line bg-surface-raised p-5 shadow-2xl sm:max-h-[calc(100dvh-3rem)] sm:p-6">
             <h2 className="text-base font-semibold text-text">Connect management API</h2>
             <p className="mt-2 text-xs leading-relaxed text-text-muted">
               Paste the <code>pb_live_...</code> key shown once when you provision an agent. It stays in this browser only.

@@ -180,7 +180,7 @@ export default function Playground({ vaultAddress }: PlaygroundProps) {
   return (
     <div className="rounded-xl border border-line bg-surface-raised p-6 space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-text-faint">
           <Sparkle size={14} weight="bold" className="text-accent" />
           Interactive Playground
@@ -203,11 +203,11 @@ export default function Playground({ vaultAddress }: PlaygroundProps) {
       </div>
 
       {/* Run Full Demo Button */}
-      <div className="flex flex-wrap items-center gap-3">
+      <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center">
         <button
           onClick={runFullDemo}
           disabled={!canRunFullDemo || isAnyRunning}
-          className="flex items-center gap-2 rounded-full bg-accent px-5 py-2.5 text-sm font-semibold text-surface transition-colors hover:bg-accent-deep disabled:cursor-not-allowed disabled:opacity-50"
+          className="flex min-h-11 items-center justify-center gap-2 rounded-full bg-accent px-5 py-2.5 text-sm font-semibold text-surface transition-colors hover:bg-accent-deep disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
         >
           {isAnyRunning ? (
             <CircleNotch size={16} className="animate-spin" />

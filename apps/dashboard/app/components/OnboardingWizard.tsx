@@ -61,40 +61,35 @@ export function OnboardingWizard({ state }: { state: OnboardingState }) {
   const progressPercent = Math.round((completedCount / steps.length) * 100);
 
   return (
-    <div className="rounded-xl border border-accent/20 bg-accent/5 p-6 space-y-4 shadow-sm animate-in fade-in duration-300">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-accent/10 pb-4">
+    <section aria-labelledby="workspace-setup-title" className="rounded-xl border border-accent/20 bg-accent/5 p-4 shadow-sm sm:p-6">
+      <div className="flex flex-col gap-3 border-b border-accent/10 pb-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <div className="flex items-center gap-2">
-            <span className="flex h-2 w-2 rounded-full bg-accent animate-ping" />
-            <h2 className="text-xs font-bold uppercase tracking-wider text-accent">
-              No-Terminal Quickstart Wizard
-            </h2>
-          </div>
+          <h2 id="workspace-setup-title" className="text-sm font-semibold tracking-[-0.01em] text-text">Set up your workspace</h2>
           <p className="text-xs text-text-muted mt-0.5">
-            Follow the 6-step flow to configure spending controls on Arc Testnet
+            Complete the steps below to configure spending controls on Arc Testnet.
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 sm:justify-end">
           <div className="text-right">
             <span className="text-xs font-mono font-bold text-accent">
-              {completedCount} / {steps.length} Completed ({progressPercent}%)
+              {completedCount} of {steps.length} complete
             </span>
           </div>
-          <div className="h-2 w-28 bg-line rounded-full overflow-hidden">
+          <div className="h-1.5 w-24 overflow-hidden rounded-full bg-line" aria-label={`${progressPercent}% setup complete`}>
             <div
-              className="h-full bg-accent transition-all duration-500 rounded-full"
+              className="h-full rounded-full bg-accent transition-all duration-500"
               style={{ width: `${progressPercent}%` }}
             />
           </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-3">
+      <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {steps.map((step) => (
           <Link
             key={step.id}
             href={step.link}
-            className={`p-3.5 rounded-lg border transition-all group ${
+            className={`min-h-[96px] rounded-lg border p-3.5 transition-all group ${
               step.completed
                 ? "border-emerald-500/30 bg-emerald-500/5 hover:border-emerald-500/50"
                 : "border-line bg-surface hover:border-accent/40"
@@ -106,7 +101,7 @@ export function OnboardingWizard({ state }: { state: OnboardingState }) {
                   step.completed ? "text-emerald-400" : "text-accent group-hover:underline"
                 }`}
               >
-                {step.title}
+                {step.title.replace(/^\d+\.\s*/, "")}
               </span>
               {step.completed && <span className="text-xs text-emerald-400 font-bold">✓</span>}
             </div>
@@ -114,6 +109,6 @@ export function OnboardingWizard({ state }: { state: OnboardingState }) {
           </Link>
         ))}
       </div>
-    </div>
+    </section>
   );
 }

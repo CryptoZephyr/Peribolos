@@ -100,32 +100,10 @@ export default function LoginPage() {
         
         {/* LEFT PANEL - Visual Showcase & Interactive Policy Card (Matching reference design) */}
         <section className="relative hidden lg:flex lg:col-span-6 flex-col justify-between bg-[#f5f7fa] p-10 xl:p-12 border-r border-slate-100/90 overflow-hidden select-none">
-          {/* Halftone / Dot Matrix Background Grid */}
-          <div
-            aria-hidden
-            className="pointer-events-none absolute inset-0 opacity-[0.14]"
-            style={{
-              backgroundImage: "radial-gradient(#0f172a 1.2px, transparent 1.2px)",
-              backgroundSize: "16px 16px",
-              maskImage: "radial-gradient(ellipse at 50% 45%, black 30%, transparent 80%)",
-            }}
-          />
-
-          {/* Top Brand Bar & Floating Node Indicator */}
+          {/* Top brand bar */}
           <div className="relative z-10 flex items-center justify-between">
             <PeribolosLogo size={30} showBadge={false} />
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-600/20 bg-emerald-50/80 px-3 py-1 text-[11px] font-semibold text-emerald-700 backdrop-blur-sm">
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-              Arc Network Active
-            </span>
-          </div>
-
-          {/* Top-Left Floating Badge Accent */}
-          <div className="absolute top-[88px] left-10 flex items-center gap-2 rounded-2xl border border-white/90 bg-white/90 px-3 py-2 shadow-sm backdrop-blur-md">
-            <div className="flex h-7 w-7 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
-              <ShieldCheck size={16} weight="bold" />
-            </div>
-            <div className="h-0.5 w-7 bg-gradient-to-r from-emerald-500 to-transparent rounded-full" />
+            <span className="text-[11px] font-semibold tracking-[0.08em] text-slate-500">ARC TESTNET</span>
           </div>
 
           {/* CENTER FLOATING CARD (Directly mirroring the voice aura interactive widget) */}
@@ -200,13 +178,6 @@ export default function LoginPage() {
                 </>
               )}
             </div>
-          </div>
-
-          {/* Bottom-Right Node Badge */}
-          <div className="absolute bottom-[145px] right-10 flex items-center gap-2 rounded-xl border border-slate-200/80 bg-white/90 px-3.5 py-2 text-xs font-semibold text-slate-700 shadow-sm backdrop-blur-md">
-            <div className="h-0.5 w-6 bg-gradient-to-l from-emerald-500 to-transparent rounded-full" />
-            <span className="flex h-5 w-5 items-center justify-center rounded-md bg-slate-900 text-white font-mono text-[10px]">A</span>
-            <span className="text-[11px] font-medium text-slate-600">Contract Safety</span>
           </div>
 
           {/* Bottom Left Headline & Subtext */}

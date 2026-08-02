@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Gear,
   ShieldCheck,
@@ -13,6 +13,9 @@ import {
 } from "@phosphor-icons/react";
 import { useToast } from "@/app/components/Toast";
 import { useSupabaseAuth } from "@/app/auth/SupabaseAuthProvider";
+import { rpcUrl } from "@/lib/chain";
+
+const SETTINGS_STORAGE_KEY = "peribolos.workspace-settings.v1";
 
 export default function WorkspaceSettingsPage() {
   const toast = useToast();
@@ -25,10 +28,26 @@ export default function WorkspaceSettingsPage() {
   const [defaultPerTxCap, setDefaultPerTxCap] = useState("25");
   const [require2FA, setRequire2FA] = useState(true);
   const [autoPauseOnAnomaly, setAutoPauseOnAnomaly] = useState(true);
-  const [rpcUrl, setRpcUrl] = useState("https://arc-testnet.rpc.peribolos.io");
-  const [webhookUrl, setWebhookUrl] = useState("https://api.peribolos.io/v1/webhooks/alerts");
+  const [rpcEndpoint, setRpcEndpoint] = useState(rpcUrl);
+  const [webhookUrl, setWebhookUrl] = useState("");
   const [saving, setSaving] = useState(false);
   const [registeringPasskey, setRegisteringPasskey] = useState(false);
+
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(SETTINGS_STORAGE_KEY) || "null");
+      if (!saved) return;
+      if (typeof saved.workspaceName === "string") setWorkspaceName(saved.workspaceName);
+      if (typeof saved.defaultDailyCap === "string") setDefaultDailyCap(saved.defaultDailyCap);
+      if (typeof saved.defaultPerTxCap === "string") setDefaultPerTxCap(saved.defaultPerTxCap);
+      if (typeof saved.require2FA === "boolean") setRequire2FA(saved.require2FA);
+      if (typeof saved.autoPauseOnAnomaly === "boolean") setAutoPauseOnAnomaly(saved.autoPauseOnAnomaly);
+      if (typeof saved.rpcEndpoint === "string") setRpcEndpoint(saved.rpcEndpoint);
+      if (typeof saved.webhookUrl === "string") setWebhookUrl(saved.webhookUrl);
+    } catch {
+      // Ignore malformed local preferences and keep safe defaults.
+    }
+  }, []);
 
   async function handleRegisterPasskey() {
     setRegisteringPasskey(true);
@@ -48,10 +67,12 @@ export default function WorkspaceSettingsPage() {
   function handleSave(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
-    setTimeout(() => {
-      setSaving(false);
-      toast.success("Settings Saved", "Workspace policies and preferences updated successfully.");
-    }, 400);
+    localStorage.setItem(
+      SETTINGS_STORAGE_KEY,
+      JSON.stringify({ workspaceName, defaultDailyCap, defaultPerTxCap, require2FA, autoPauseOnAnomaly, rpcEndpoint, webhookUrl }),
+    );
+    setSaving(false);
+    toast.success("Preferences saved", "These workspace defaults are saved on this browser.");
   }
 
   return (
@@ -64,7 +85,7 @@ export default function WorkspaceSettingsPage() {
         </div>
         <h1 className="mt-2 text-3xl font-semibold tracking-[-0.04em] text-text">Workspace Settings</h1>
         <p className="mt-1 text-sm text-text-muted">
-          Manage workspace defaults, contract policy triggers, network RPC endpoints, and alert webhooks.
+          Manage workspace defaults and connection details for this browser session.
         </p>
       </div>
 
@@ -125,8 +146,8 @@ export default function WorkspaceSettingsPage() {
         {activeTab === "general" && (
           <div className="space-y-5">
             <div>
-              <h2 className="text-base font-semibold text-text">General Workspace Defaults</h2>
-              <p className="text-xs text-text-muted mt-1">Configure baseline parameters for newly provisioned vaults.</p>
+          <h2 className="text-base font-semibold text-text">General Workspace Defaults</h2>
+              <p className="text-xs text-text-muted mt-1">Set the values you want to reuse when provisioning a new vault.</p>
             </div>
 
             <div className="space-y-4 pt-2">
@@ -236,11 +257,11 @@ export default function WorkspaceSettingsPage() {
                 <label className="block text-xs font-semibold text-text mb-1.5">Arc Testnet RPC Endpoint</label>
                 <input
                   type="url"
-                  value={rpcUrl}
-                  onChange={(e) => setRpcUrl(e.target.value)}
+                  value={rpcEndpoint}
+                  onChange={(e) => setRpcEndpoint(e.target.value)}
                   className="w-full rounded-lg border border-line bg-surface px-4 py-2.5 text-xs text-text focus:border-accent focus:outline-none font-mono"
                 />
-                <p className="mt-1 text-[11px] text-text-muted">Primary RPC node used for reading on-chain vault state and broadcasting owner calls.</p>
+                <p className="mt-1 text-[11px] text-text-muted">Current app default: <span className="font-mono text-text-faint">{rpcUrl}</span>. This field is stored locally for reference.</p>
               </div>
             </div>
           </div>
@@ -262,21 +283,22 @@ export default function WorkspaceSettingsPage() {
                   onChange={(e) => setWebhookUrl(e.target.value)}
                   className="w-full rounded-lg border border-line bg-surface px-4 py-2.5 text-xs text-text focus:border-accent focus:outline-none font-mono"
                 />
-                <p className="mt-1 text-[11px] text-text-muted">Payload includes blocked payment details, agent ID, payee address, and failure reason code.</p>
+                <p className="mt-1 text-[11px] text-text-muted">Optional endpoint reference. Webhook delivery is not enabled until a server integration is configured.</p>
               </div>
             </div>
           </div>
         )}
 
-        <div className="pt-4 border-t border-line flex items-center justify-end">
-          <button
+        <div className="flex flex-col gap-2 border-t border-line pt-4 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-[11px] text-text-muted">Saved on this browser; these preferences do not change on-chain policy.</p>
+            <button
             type="submit"
             disabled={saving}
             className="flex items-center gap-2 rounded-lg bg-text px-5 py-2.5 text-xs font-semibold text-white shadow-sm hover:bg-accent disabled:opacity-60 transition-all"
           >
             {saving ? "Saving..." : "Save Preferences"}
             {!saving && <Check size={14} weight="bold" />}
-          </button>
+            </button>
         </div>
       </form>
     </div>

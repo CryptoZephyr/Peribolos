@@ -57,15 +57,15 @@ export function Hero() {
                 </span>
                 <div>
                   <p className="text-xs font-semibold text-text">Agent spend policy</p>
-                  <p className="text-[11px] text-text-faint">vault_01 · Arc testnet</p>
+                  <p className="text-[11px] text-text-faint">Managed vault · Arc testnet</p>
                 </div>
               </div>
               <span className="rounded-md bg-accent-tint px-2 py-1 text-[10px] font-semibold text-accent">Enforced</span>
             </div>
             <div className="mt-4 grid grid-cols-3 gap-2 border-t border-line pt-3 text-[11px]">
-              <span><strong className="block text-sm font-semibold text-text">$500</strong><span className="text-text-faint">daily cap</span></span>
-              <span><strong className="block text-sm font-semibold text-text">18</strong><span className="text-text-faint">recipients</span></span>
-              <span><strong className="block text-sm font-semibold text-blocked">12</strong><span className="text-text-faint">blocked</span></span>
+              <span><strong className="block text-sm font-semibold text-text">Configured</strong><span className="text-text-faint">daily policy</span></span>
+              <span><strong className="block text-sm font-semibold text-text">Allowlisted</strong><span className="text-text-faint">recipients only</span></span>
+              <span><strong className="block text-sm font-semibold text-blocked">Blocked</strong><span className="text-text-faint">by rules</span></span>
             </div>
           </div>
         </figure>

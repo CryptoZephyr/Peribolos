@@ -213,7 +213,7 @@ export default function AgentsPage() {
 
   return (
     <div className="space-y-8 animate-in fade-in duration-300">
-      <div className="flex items-center justify-between border-b border-line pb-6">
+      <div className="flex flex-col gap-4 border-b border-line pb-6 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-text">Autonomous Agents</h1>
           <p className="text-sm text-text-muted mt-1">
@@ -222,7 +222,7 @@ export default function AgentsPage() {
         </div>
         <button
           onClick={() => setShowCreateModal(true)}
-          className="rounded-md bg-accent px-4 py-2 text-xs font-semibold text-white hover:opacity-90 shadow-sm transition-all"
+          className="w-full rounded-md bg-accent px-4 py-2.5 text-xs font-semibold text-white shadow-sm transition-all hover:opacity-90 sm:w-auto"
         >
           + Provision New Agent
         </button>
@@ -378,38 +378,42 @@ export default function AgentsPage() {
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-text-muted">Daily Budget Cap:</span>
-                    <span className="font-mono font-semibold text-text">${vault?.dailyCapUsdc || 100} USDC</span>
+                    <span className="font-mono font-semibold text-text">
+                      {vault?.dailyCapUsdc != null ? `$${vault.dailyCapUsdc} USDC` : "Not configured"}
+                    </span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-text-muted">Per-Tx Cap:</span>
-                    <span className="font-mono font-semibold text-text">${vault?.perTxCapUsdc || 25} USDC</span>
+                    <span className="font-mono font-semibold text-text">
+                      {vault?.perTxCapUsdc != null ? `$${vault.perTxCapUsdc} USDC` : "Not configured"}
+                    </span>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-3 pt-1">
+                <div className="flex flex-col gap-2 pt-1 sm:flex-row sm:items-center sm:gap-3">
                   <button
                     onClick={() =>
                       vault && promptRotateSigner(vault.id, agent.id, agent.name, vault.mode, vault.address)
                     }
-                    className="flex-1 rounded-md border border-line bg-surface px-3 py-2 text-xs font-semibold text-text hover:bg-surface-raised transition-colors"
+                    className="min-h-11 flex-1 rounded-md border border-line bg-surface px-3 py-2 text-xs font-semibold text-text transition-colors hover:bg-surface-raised"
                   >
                     {vault?.mode === "live"
-                      ? "🔑 Rotate On-Chain Key"
+                      ? "Rotate On-Chain Key"
                       : isLegacyLocalSigner
-                        ? "♻ Re-provision DCW"
-                        : "🔄 Rotate Signer"}
+                        ? "Re-provision DCW"
+                        : "Rotate Signer"}
                   </button>
                   <button
                     onClick={() =>
                       vault && promptPauseVault(vault.id, vault.paused, agent.name)
                     }
-                    className={`flex-1 rounded-md px-3 py-2 text-xs font-semibold text-white transition-opacity ${
+                    className={`min-h-11 flex-1 rounded-md px-3 py-2 text-xs font-semibold text-white transition-opacity ${
                       vault?.paused
                         ? "bg-emerald-600 hover:bg-emerald-500"
                         : "bg-rose-600 hover:bg-rose-500"
                     }`}
                   >
-                    {vault?.paused ? "▶ Unpause Vault" : "⏸ Pause Vault"}
+                    {vault?.paused ? "Unpause Vault" : "Pause Vault"}
                   </button>
                 </div>
               </div>
@@ -431,8 +435,8 @@ export default function AgentsPage() {
       </Modal>
 
       {showCreateModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-          <div className="w-full max-w-md rounded-xl border border-line bg-surface-raised p-6 space-y-5 shadow-2xl">
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/60 p-4 backdrop-blur-sm sm:items-center sm:p-6 animate-in fade-in duration-200">
+          <div className="my-auto max-h-[calc(100dvh-2rem)] w-full max-w-md space-y-5 overflow-y-auto rounded-xl border border-line bg-surface-raised p-5 shadow-2xl sm:max-h-[calc(100dvh-3rem)] sm:p-6">
             <h2 className="text-lg font-bold text-text">Provision New Autonomous Agent</h2>
             <form onSubmit={handleCreateAgent} className="space-y-4">
               <div>

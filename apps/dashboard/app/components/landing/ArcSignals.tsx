@@ -5,8 +5,8 @@ import { Reveal } from "./Reveal";
 
 const SIGNALS = [
   { value: "USDC", label: "native gas and balances" },
-  { value: "~0.48s", label: "testnet block time" },
-  { value: "EVM", label: "compatible contracts" },
+  { value: "EVM", label: "compatible smart contracts" },
+  { value: "Arc", label: "settlement layer" },
 ];
 
 export function ArcSignals() {

@@ -132,12 +132,6 @@ export function CreateDomainWizard({
   function regenerateKey() {
     // Advanced direct-contract path only. Primary MVP flow uses dashboard
     // managed signers (server-side AES-GCM) — never put agent keys in the browser for production.
-    if (typeof window !== "undefined") {
-      const ok = window.confirm(
-        "Advanced: generate a client-side agent key for direct contract mode?\n\nPrefer the no-terminal path: Dashboard → Agents → Provision (managed signer + pb_live API key)."
-      );
-      if (!ok) return;
-    }
     setGeneratedKey(generatePrivateKey());
     setCopied(false);
   }
@@ -333,6 +327,9 @@ export function CreateDomainWizard({
 
           {keyMode === "generate" ? (
             <div className="mt-3">
+              <div className="mb-3 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs leading-relaxed text-amber-200">
+                This advanced path creates a private key in your browser. Peribolos never stores it; use the managed signer path unless you control key custody yourself.
+              </div>
               {!generatedKey ? (
                 <button
                   onClick={regenerateKey}

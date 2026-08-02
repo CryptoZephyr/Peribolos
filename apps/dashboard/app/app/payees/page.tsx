@@ -128,8 +128,8 @@ export default function PayeesPage() {
       )}
 
       {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-          <div className="w-full max-w-md rounded-xl border border-line bg-surface-raised p-6 space-y-4 shadow-2xl">
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/60 p-4 backdrop-blur-sm animate-in fade-in duration-200 sm:items-center sm:p-6">
+          <div className="my-auto max-h-[calc(100dvh-2rem)] w-full max-w-md space-y-4 overflow-y-auto rounded-xl border border-line bg-surface-raised p-5 shadow-2xl sm:max-h-[calc(100dvh-3rem)] sm:p-6">
             <h2 className="text-lg font-bold text-text">Add Approved Payee</h2>
             <form onSubmit={handleAddPayee} className="space-y-4">
               <div>
@@ -182,17 +182,17 @@ export default function PayeesPage() {
                 />
               </div>
 
-              <div className="flex items-center justify-end gap-3 pt-2">
+              <div className="flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:items-center sm:justify-end sm:gap-3">
                 <button
                   type="button"
                   onClick={() => setShowModal(false)}
-                  className="rounded-md border border-line px-4 py-2 text-xs font-medium text-text hover:bg-surface"
+                  className="min-h-11 rounded-md border border-line px-4 py-2 text-xs font-medium text-text hover:bg-surface"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="rounded-md bg-accent px-4 py-2 text-xs font-semibold text-white hover:opacity-90 transition-opacity"
+                  className="min-h-11 rounded-md bg-accent px-4 py-2 text-xs font-semibold text-white transition-opacity hover:opacity-90"
                 >
                   Save Payee
                 </button>

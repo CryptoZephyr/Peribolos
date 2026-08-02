@@ -30,7 +30,7 @@ function AuthCallbackContent() {
   }, [router, searchParams]);
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-surface px-6">
+    <main className="flex min-h-[100dvh] items-center justify-center bg-surface px-6">
       <p className="text-sm text-text-muted">{error ? `Unable to complete sign-in: ${error}` : "Completing sign-in…"}</p>
     </main>
   );

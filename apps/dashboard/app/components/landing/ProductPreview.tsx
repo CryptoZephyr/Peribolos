@@ -1,13 +1,7 @@
 "use client";
 
-import { ArrowUpRight, CaretDown, CheckCircle, DotsThree, ShieldCheck, WarningCircle } from "@phosphor-icons/react";
+import { ArrowUpRight, CheckCircle, ShieldCheck, WarningCircle } from "@phosphor-icons/react";
 import { Reveal } from "./Reveal";
-
-const EVENTS = [
-  { action: "peribolos_pay", recipient: "api.openai.com", amount: "$18.40", status: "Allowed", tone: "allowed" },
-  { action: "peribolos_pay", recipient: "unknown-wallet.eth", amount: "$0.00", status: "Blocked", tone: "blocked" },
-  { action: "peribolos_buy", recipient: "api.anthropic.com", amount: "$42.80", status: "Allowed", tone: "allowed" },
-];
 
 export function ProductPreview() {
   return (
@@ -39,60 +33,37 @@ export function ProductPreview() {
                   <p className="text-[11px] text-text-faint">Arc testnet policies</p>
                 </div>
               </div>
-              <button type="button" className="flex items-center gap-1 rounded-md border border-line px-2.5 py-1.5 text-[11px] font-medium text-text-muted hover:border-line-strong hover:text-text">
-                Last 7 days
-                <CaretDown size={12} aria-hidden />
-              </button>
+              <span className="text-[11px] font-medium text-text-faint">Policy snapshot</span>
             </div>
 
-            <div className="grid grid-cols-3 gap-2 border-b border-line bg-surface px-4 py-4 sm:gap-3 sm:px-5">
+            <div className="grid gap-3 border-b border-line bg-surface px-4 py-4 sm:grid-cols-3 sm:gap-4 sm:px-5">
               <div>
-                <p className="text-[11px] text-text-faint">USDC balance</p>
-                <p className="mt-1 text-lg font-semibold tracking-[-0.04em] text-text">$2,840.20</p>
+                <p className="text-[11px] text-text-faint">Recipient rules</p>
+                <p className="mt-1 text-sm font-semibold text-text">Allowlisted only</p>
               </div>
               <div>
-                <p className="text-[11px] text-text-faint">Daily cap</p>
-                <p className="mt-1 text-lg font-semibold tracking-[-0.04em] text-text">$500.00</p>
+                <p className="text-[11px] text-text-faint">Budget checks</p>
+                <p className="mt-1 text-sm font-semibold text-text">Per transaction + daily</p>
               </div>
               <div>
-                <p className="text-[11px] text-text-faint">Blocked</p>
-                <p className="mt-1 text-lg font-semibold tracking-[-0.04em] text-blocked">12</p>
+                <p className="text-[11px] text-text-faint">Settlement</p>
+                <p className="mt-1 text-sm font-semibold text-accent">Blocked before funds move</p>
               </div>
             </div>
 
             <div className="px-4 py-4 sm:px-5 sm:py-5">
               <div className="mb-3 flex items-center justify-between">
-                <p className="text-xs font-semibold text-text">Recent activity</p>
-                <button type="button" className="text-text-faint transition-colors hover:text-text" aria-label="More activity options">
-                  <DotsThree size={18} weight="bold" aria-hidden />
-                </button>
+                <p className="text-xs font-semibold text-text">Every payment request is checked against policy</p>
               </div>
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[420px] text-left text-xs">
-                  <thead className="border-b border-line text-[10px] uppercase tracking-[0.08em] text-text-faint">
-                    <tr>
-                      <th className="pb-2 font-medium">Tool call</th>
-                      <th className="pb-2 font-medium">Recipient</th>
-                      <th className="pb-2 text-right font-medium">Amount</th>
-                      <th className="pb-2 pl-4 text-right font-medium">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {EVENTS.map((event) => (
-                      <tr key={`${event.action}-${event.recipient}`} className="border-b border-line last:border-0">
-                        <td className="py-3 font-mono text-[11px] text-text">{event.action}</td>
-                        <td className="py-3 text-text-muted">{event.recipient}</td>
-                        <td className="py-3 text-right font-mono text-[11px] text-text">{event.amount}</td>
-                        <td className="py-3 pl-4 text-right">
-                          <span className={`inline-flex items-center gap-1 ${event.tone === "blocked" ? "text-blocked" : "text-accent"}`}>
-                            {event.tone === "blocked" ? <WarningCircle size={13} weight="bold" aria-hidden /> : <CheckCircle size={13} weight="bold" aria-hidden />}
-                            {event.status}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+              <div className="grid gap-2 text-xs sm:grid-cols-2">
+                <div className="flex items-center gap-2 rounded-lg border border-line bg-surface px-3 py-3 text-text-muted">
+                  <CheckCircle size={15} weight="bold" className="shrink-0 text-accent" aria-hidden />
+                  Approved requests continue to settlement.
+                </div>
+                <div className="flex items-center gap-2 rounded-lg border border-line bg-surface px-3 py-3 text-text-muted">
+                  <WarningCircle size={15} weight="bold" className="shrink-0 text-blocked" aria-hidden />
+                  Unapproved requests are rejected with a reason.
+                </div>
               </div>
             </div>
           </div>

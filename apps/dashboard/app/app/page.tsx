@@ -10,11 +10,11 @@ import { ArrowRight, ShieldCheck, Wallet } from "@phosphor-icons/react";
 
 export default function DashboardOverviewPage() {
   const [stats, setStats] = useState({
-    agentsCount: 1,
-    vaultsCount: 1,
-    payeesCount: 2,
-    todaySpentUsdc: 2.50,
-    dailyCapUsdc: 100.0,
+    agentsCount: 0,
+    vaultsCount: 0,
+    payeesCount: 0,
+    todaySpentUsdc: 0,
+    dailyCapUsdc: 0,
     blockedAttemptsCount: 0,
   });
 
@@ -61,11 +61,13 @@ export default function DashboardOverviewPage() {
         setStats({
           agentsCount: hasAgent ? agents.length : 0,
           vaultsCount: hasVault ? vaults.length : 0,
-          payeesCount: hasPayee ? payees.length : 2,
+          payeesCount: hasPayee ? payees.length : 0,
           todaySpentUsdc: prs
             .filter((pr: any) => pr.status === 'EXECUTED')
-            .reduce((acc: number, cur: any) => acc + (cur.amountUsdc || 0), 2.50),
-          dailyCapUsdc: 100.0,
+            .reduce((acc: number, cur: any) => acc + (cur.amountUsdc || 0), 0),
+          dailyCapUsdc: Array.isArray(vaults)
+            ? vaults.reduce((acc: number, vault: any) => acc + Number(vault.dailyCapUsdc || 0), 0)
+            : 0,
           blockedAttemptsCount: blocked,
         });
       } catch (err) {
@@ -78,6 +80,9 @@ export default function DashboardOverviewPage() {
   }, []);
 
   const setupComplete = Object.values(onboardingState).every(Boolean);
+  const budgetUsage = stats.dailyCapUsdc > 0
+    ? Math.min(100, (stats.todaySpentUsdc / stats.dailyCapUsdc) * 100)
+    : 0;
 
   return (
     <div className="space-y-7 animate-in fade-in duration-300">
@@ -126,15 +131,22 @@ export default function DashboardOverviewPage() {
           <div className="app-panel p-5">
             <div className="flex items-start justify-between"><p className="text-xs font-semibold text-text-muted">Daily budget</p><span className={`inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-semibold ${stats.blockedAttemptsCount > 0 ? "bg-blocked-tint text-blocked" : "bg-accent-tint text-accent"}`}><span className={`h-1.5 w-1.5 rounded-full ${stats.blockedAttemptsCount > 0 ? "bg-blocked" : "bg-accent"}`} />{stats.blockedAttemptsCount > 0 ? `${stats.blockedAttemptsCount} blocked` : "All clear"}</span></div>
             <p className="mt-6 text-2xl font-semibold tracking-[-0.045em] text-text">
-              ${stats.todaySpentUsdc.toFixed(2)} <span className="text-xs text-text-muted font-normal">/ ${stats.dailyCapUsdc.toFixed(2)} USDC</span>
+              {stats.dailyCapUsdc > 0 ? (
+                <>{`$${stats.todaySpentUsdc.toFixed(2)}`} <span className="text-xs font-normal text-text-muted">/ ${stats.dailyCapUsdc.toFixed(2)} USDC</span></>
+              ) : (
+                <span className="text-lg text-text-muted">Not configured</span>
+              )}
             </p>
-            <div className="mt-4 h-1.5 w-full overflow-hidden rounded-full bg-line">
-              <div
-                className="h-full bg-accent rounded-full transition-all duration-500"
-                style={{ width: `${Math.min(100, (stats.todaySpentUsdc / stats.dailyCapUsdc) * 100)}%` }}
-              />
-            </div>
-            <p className="mt-2 text-xs text-text-muted">{Math.round(Math.min(100, (stats.todaySpentUsdc / stats.dailyCapUsdc) * 100))}% of the configured limit used.</p>
+            {stats.dailyCapUsdc > 0 ? (
+              <>
+                <div className="mt-4 h-1.5 w-full overflow-hidden rounded-full bg-line" aria-label={`${Math.round(budgetUsage)}% of daily budget used`}>
+                  <div className="h-full rounded-full bg-accent transition-all duration-500" style={{ width: `${budgetUsage}%` }} />
+                </div>
+                <p className="mt-2 text-xs text-text-muted">{Math.round(budgetUsage)}% of the configured limit used.</p>
+              </>
+            ) : (
+              <p className="mt-2 text-xs text-text-muted">Create a vault to start tracking a daily spending limit.</p>
+            )}
           </div>
         </section>
       )}

@@ -21,12 +21,14 @@ export function Nav() {
           >
             How it works
           </a>
-          <Link
-            href="/docs"
+          <a
+            href="https://docs.arc.network"
+            target="_blank"
+            rel="noreferrer"
             className="hidden text-sm text-text-muted transition-colors hover:text-text sm:inline"
           >
-            Docs
-          </Link>
+            Arc docs
+          </a>
           <Link
             href="/login"
             className="rounded-lg bg-text px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-accent"
