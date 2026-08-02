@@ -118,3 +118,16 @@ CREATE TABLE IF NOT EXISTS chain_events (
   block_number INTEGER NOT NULL,
   timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- The API currently stores its relational model as one versioned JSON snapshot.
+-- Keeping the snapshot in Supabase makes the free Render service restart-safe
+-- without exposing the service-role key to the browser.
+CREATE TABLE IF NOT EXISTS peribolos_state (
+  id TEXT PRIMARY KEY CHECK (id = 'primary'),
+  data JSONB NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+ALTER TABLE peribolos_state ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON TABLE peribolos_state FROM anon, authenticated;
+GRANT ALL ON TABLE peribolos_state TO service_role;

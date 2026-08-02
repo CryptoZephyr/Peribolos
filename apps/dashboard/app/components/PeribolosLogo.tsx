@@ -1,4 +1,6 @@
+import Image from "next/image";
 import type { SVGProps } from "react";
+import PeribolosArtwork from "../../../../Peribolos_redesign/Peribolos_logo.png";
 
 interface PeribolosLogoProps extends SVGProps<SVGSVGElement> {
   size?: number;
@@ -21,55 +23,15 @@ export function PeribolosLogoMark({ size = 28, className = "", ...props }: Perib
       className={`shrink-0 ${className}`}
       {...props}
     >
-      <defs>
-        {/* Emerald accent gradient */}
-        <linearGradient id="p-shield-grad" x1="4" y1="2" x2="28" y2="30" gradientUnits="userSpaceOnUse">
-          <stop offset="0%" stopColor="#34d399" />
-          <stop offset="100%" stopColor="#059669" />
-        </linearGradient>
-
-        {/* Inner vault lock gradient */}
-        <linearGradient id="p-core-grad" x1="10" y1="8" x2="22" y2="24" gradientUnits="userSpaceOnUse">
-          <stop offset="0%" stopColor="#ffffff" />
-          <stop offset="100%" stopColor="#a7f3d0" />
-        </linearGradient>
-
-        {/* Ambient glow filter */}
-        <filter id="p-glow" x="-20%" y="-20%" width="140%" height="140%">
-          <feDropShadow dx="0" dy="2" stdDeviation="3" floodColor="#34d399" floodOpacity="0.25" />
-        </filter>
-      </defs>
-
-      {/* Outer Hexagonal Protective Shield / Perimeter Wall */}
+      <rect x="2.5" y="2.5" width="27" height="27" rx="8" fill="#14243C" />
       <path
-        d="M16 2.5L28.5 7.5V16.5C28.5 23.5 23 27.8 16 30C9 27.8 3.5 23.5 3.5 16.5V7.5L16 2.5Z"
-        fill="#131316"
-        stroke="url(#p-shield-grad)"
-        strokeWidth="2"
-        strokeLinejoin="round"
-        filter="url(#p-glow)"
-      />
-
-      {/* Inner Circuit Node Lines */}
-      <path
-        d="M16 6V9.5M8.5 10.5L11.5 12.5M23.5 10.5L20.5 12.5"
-        stroke="#34d399"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-        strokeOpacity="0.6"
-      />
-
-      {/* Stylized Vault "P" & Keyhole Lock Monogram */}
-      <path
-        d="M11 10.5H17C19.5 10.5 21.2 12.1 21.2 14.5C21.2 16.9 19.5 18.5 17 18.5H14.2V23"
-        stroke="url(#p-core-grad)"
-        strokeWidth="2.5"
+        d="M9 10.5v8.8a4.7 4.7 0 0 0 4.7 4.7h1.1a5.2 5.2 0 0 0 5.2-5.2v-1.1a5.2 5.2 0 0 0-5.2-5.2H13"
+        stroke="#22C980"
+        strokeWidth="3.1"
         strokeLinecap="round"
         strokeLinejoin="round"
       />
-
-      {/* Agent Vault Core Node */}
-      <circle cx="14.2" cy="14.5" r="1.8" fill="#34d399" />
+      <path d="M9 21.4h5.8" stroke="#22C980" strokeWidth="3.1" strokeLinecap="round" />
     </svg>
   );
 }
@@ -80,11 +42,22 @@ export function PeribolosLogoMark({ size = 28, className = "", ...props }: Perib
 export function PeribolosLogo({ size = 26, showBadge = true }: { size?: number; showBadge?: boolean }) {
   return (
     <div className="flex items-center gap-2.5 select-none">
-      <PeribolosLogoMark size={size} />
-      <div className="flex items-center gap-2 font-bold tracking-tight text-text text-base">
+      <span
+        className="relative flex shrink-0 items-center justify-center overflow-hidden border border-line bg-white shadow-[0_4px_12px_rgba(16,24,40,0.12)]"
+        style={{ width: size, height: size, borderRadius: Math.max(7, Math.round(size * 0.28)) }}
+      >
+        <Image
+          src={PeribolosArtwork}
+          alt="Peribolos logo"
+          fill
+          sizes={`${size}px`}
+          className="scale-[1.65] object-cover"
+        />
+      </span>
+      <div className="flex items-center gap-2 font-semibold tracking-[-0.02em] text-text text-base">
         <span>Peribolos</span>
         {showBadge && (
-          <span className="text-[10px] font-mono font-medium tracking-wide text-accent bg-accent-tint border border-accent/20 px-1.5 py-0.5 rounded">
+          <span className="text-[10px] font-mono font-medium tracking-wide text-accent bg-accent-tint border border-accent/20 px-1.5 py-0.5 rounded-md">
             V2
           </span>
         )}

@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { API_BASE_URL } from "@/lib/api-client";
 
 export default function SecurityPage() {
   return (
@@ -54,19 +53,10 @@ export default function SecurityPage() {
           <p>
             Export every allowed, blocked, and failed payment attempt for compliance and incident review.
           </p>
-          <div className="flex flex-wrap gap-3 pt-1">
-            <a
-              href={`${API_BASE_URL}/v1/audit/export?format=csv`}
-              className="rounded-md bg-accent px-4 py-2 text-xs font-semibold text-white hover:opacity-90"
-            >
-              Export CSV
-            </a>
-            <a
-              href={`${API_BASE_URL}/v1/audit/export?format=json`}
-              className="rounded-md border border-line px-4 py-2 text-xs font-semibold text-text hover:bg-surface"
-            >
-              Export JSON
-            </a>
+          <div className="pt-1">
+            <Link href="/app/activity" className="inline-flex items-center rounded-md bg-accent px-4 py-2 text-xs font-semibold text-white hover:bg-accent-deep">
+              Open activity exports
+            </Link>
           </div>
         </div>
 

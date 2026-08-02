@@ -17,6 +17,11 @@ contracts/broadcast/
 # Node / Next
 node_modules/
 .next/
+**/out/
+.vercel/
+.turbo/
+.cache/
+coverage/
 dist/
 *.tsbuildinfo
 

@@ -5,6 +5,7 @@ import { fetchApi } from "@/lib/api-client";
 import { useToast } from "@/app/components/Toast";
 import { SkeletonCard } from "@/app/components/Skeleton";
 import { ExplorerBadge, CopyButton } from "@/app/components/ExplorerBadge";
+import { UsersThree, Plus, ShieldCheck } from "@phosphor-icons/react";
 
 export default function PayeesPage() {
   const [payees, setPayees] = useState<any[]>([]);
@@ -52,7 +53,7 @@ export default function PayeesPage() {
 
   return (
     <div className="space-y-8 animate-in fade-in duration-300">
-      <div className="flex items-center justify-between border-b border-line pb-6">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-line pb-6">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-text">Approved Payee Registry</h1>
           <p className="text-sm text-text-muted mt-1">
@@ -61,9 +62,9 @@ export default function PayeesPage() {
         </div>
         <button
           onClick={() => setShowModal(true)}
-          className="rounded-md bg-accent px-4 py-2 text-xs font-semibold text-white hover:opacity-90 shadow-sm transition-all"
+          className="flex items-center gap-1.5 rounded-lg bg-text px-4 py-2.5 text-xs font-semibold text-white hover:bg-accent shadow-sm transition-all"
         >
-          + Add Approved Payee
+          <Plus size={15} weight="bold" /> Add Approved Payee
         </button>
       </div>
 
@@ -73,8 +74,22 @@ export default function PayeesPage() {
           <SkeletonCard />
         </div>
       ) : payees.length === 0 ? (
-        <div className="py-16 text-center text-xs text-text-muted border border-dashed border-line rounded-xl">
-          No approved payees registered yet. Click "+ Add Approved Payee" to register a vendor wallet.
+        <div className="app-panel p-12 text-center space-y-4 max-w-lg mx-auto my-8">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-accent-tint text-accent">
+            <UsersThree size={28} weight="bold" />
+          </div>
+          <div className="space-y-1">
+            <h2 className="text-base font-semibold text-text">No Approved Payees Configured</h2>
+            <p className="text-xs text-text-muted leading-relaxed">
+              Register trusted recipient wallets so your AI agents can only initiate payments to verified services and vendor APIs.
+            </p>
+          </div>
+          <button
+            onClick={() => setShowModal(true)}
+            className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-4 py-2.5 text-xs font-semibold text-white hover:opacity-90 shadow-sm transition-all"
+          >
+            <Plus size={14} weight="bold" /> Register First Payee
+          </button>
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -88,8 +103,8 @@ export default function PayeesPage() {
                   <div className="flex items-center gap-2">
                     <h3 className="text-sm font-bold text-text">{payee.name}</h3>
                     {payee.verified && (
-                      <span className="rounded bg-emerald-500/10 border border-emerald-500/30 px-1.5 py-0.5 text-[9px] font-bold text-emerald-400">
-                        VERIFIED
+                      <span className="inline-flex items-center gap-1 rounded bg-accent-tint border border-accent/20 px-1.5 py-0.5 text-[9px] font-bold text-accent">
+                        <ShieldCheck size={11} weight="bold" /> VERIFIED
                       </span>
                     )}
                   </div>
@@ -113,13 +128,14 @@ export default function PayeesPage() {
       )}
 
       {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-          <div className="w-full max-w-md rounded-xl border border-line bg-surface-raised p-6 space-y-4 shadow-2xl">
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/60 p-4 backdrop-blur-sm animate-in fade-in duration-200 sm:items-center sm:p-6">
+          <div className="my-auto max-h-[calc(100dvh-2rem)] w-full max-w-md space-y-4 overflow-y-auto rounded-xl border border-line bg-surface-raised p-5 shadow-2xl sm:max-h-[calc(100dvh-3rem)] sm:p-6">
             <h2 className="text-lg font-bold text-text">Add Approved Payee</h2>
             <form onSubmit={handleAddPayee} className="space-y-4">
               <div>
-                <label className="block text-xs font-medium text-text-muted mb-1">Payee Name</label>
+                <label htmlFor="payee-name" className="block text-xs font-medium text-text mb-1">Payee Name</label>
                 <input
+                  id="payee-name"
                   type="text"
                   required
                   placeholder="e.g. Weather Data API Provider"
@@ -129,8 +145,9 @@ export default function PayeesPage() {
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-text-muted mb-1">On-Chain Wallet Address</label>
+                <label htmlFor="payee-address" className="block text-xs font-medium text-text mb-1">On-Chain Wallet Address</label>
                 <input
+                  id="payee-address"
                   type="text"
                   required
                   placeholder="0x7099...79C8"
@@ -140,8 +157,9 @@ export default function PayeesPage() {
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-text-muted mb-1">Category</label>
+                <label htmlFor="payee-category" className="block text-xs font-medium text-text mb-1">Category</label>
                 <select
+                  id="payee-category"
                   value={category}
                   onChange={(e) => setCategory(e.target.value)}
                   className="w-full rounded-md border border-line bg-surface px-3 py-2 text-xs text-text focus:border-accent focus:outline-none"
@@ -153,8 +171,9 @@ export default function PayeesPage() {
                 </select>
               </div>
               <div>
-                <label className="block text-xs font-medium text-text-muted mb-1">Description (Optional)</label>
+                <label htmlFor="payee-desc" className="block text-xs font-medium text-text mb-1">Description (Optional)</label>
                 <input
+                  id="payee-desc"
                   type="text"
                   placeholder="Short description of service provided"
                   value={description}
@@ -163,17 +182,17 @@ export default function PayeesPage() {
                 />
               </div>
 
-              <div className="flex items-center justify-end gap-3 pt-2">
+              <div className="flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:items-center sm:justify-end sm:gap-3">
                 <button
                   type="button"
                   onClick={() => setShowModal(false)}
-                  className="rounded-md border border-line px-4 py-2 text-xs font-medium text-text hover:bg-surface"
+                  className="min-h-11 rounded-md border border-line px-4 py-2 text-xs font-medium text-text hover:bg-surface"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="rounded-md bg-accent px-4 py-2 text-xs font-semibold text-white hover:opacity-90 transition-opacity"
+                  className="min-h-11 rounded-md bg-accent px-4 py-2 text-xs font-semibold text-white transition-opacity hover:opacity-90"
                 >
                   Save Payee
                 </button>

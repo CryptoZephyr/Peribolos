@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
 export interface Workspace {
   id: string;
@@ -146,26 +147,98 @@ export interface DbSchema {
 }
 
 export const DB_FILE = process.env.PERIBOLOS_DB_FILE || path.join(process.cwd(), 'data', 'db.json');
-const DEMO_RAW_KEY = 'pb_live_demo1234567890abcdef1234567890abcdef';
+const SUPABASE_STATE_TABLE = 'peribolos_state';
+const SUPABASE_STATE_ID = 'primary';
 
 function shouldSeedDemoData(): boolean {
-  return process.env.NODE_ENV !== 'production' && process.env.PERIBOLOS_SEED_DEMO !== '0';
+  return process.env.NODE_ENV === 'test'
+    || (process.env.NODE_ENV === 'development' && process.env.PERIBOLOS_SEED_DEMO === '1');
 }
+
+function testApiKey(): string | undefined {
+  return process.env.NODE_ENV === 'test' ? process.env.PERIBOLOS_TEST_API_KEY?.trim() : undefined;
+}
+
+function emptyDbSchema(): DbSchema {
+  return {
+    workspaces: [],
+    users: [],
+    agents: [],
+    vaults: [],
+    managedSigners: [],
+    payees: [],
+    apiKeys: [],
+    paymentRequests: [],
+    chainEvents: []
+  };
+}
+
+export type PersistenceStatus = {
+  provider: 'supabase' | 'file' | 'unconfigured';
+  configured: boolean;
+  healthy: boolean;
+  lastError?: string;
+};
 
 class DatabaseStore {
   private data: DbSchema;
+  private readonly supabase: SupabaseClient | null;
+  private readonly remotePersistence: boolean;
+  private persistenceHealthy: boolean;
+  private persistenceError?: string;
+  private remoteSaveQueue: Promise<void> = Promise.resolve();
 
-  constructor() {
-    this.data = this.load();
+  private constructor(data: DbSchema, supabase: SupabaseClient | null, remotePersistence: boolean, persistenceHealthy = true, persistenceError?: string) {
+    this.data = data;
+    this.supabase = supabase;
+    this.remotePersistence = remotePersistence;
+    this.persistenceHealthy = persistenceHealthy;
+    this.persistenceError = persistenceError;
+    this.initialize();
+  }
+
+  public static async create(): Promise<DatabaseStore> {
+    const supabaseUrl = (process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL)?.trim();
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
+    const wantsRemote = process.env.NODE_ENV === 'production' || process.env.PERIBOLOS_USE_SUPABASE === '1';
+
+    if (!wantsRemote) {
+      return new DatabaseStore(DatabaseStore.loadFile(), null, false);
+    }
+
+    if (!supabaseUrl || !serviceRoleKey) {
+      console.error('[DB] Supabase persistence is not configured. Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY.');
+      return new DatabaseStore(emptyDbSchema(), null, false, false, 'SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required.');
+    }
+
+    const client = createClient(supabaseUrl, serviceRoleKey, {
+      auth: { persistSession: false, autoRefreshToken: false }
+    });
+    try {
+      const { data, error } = await client
+        .from(SUPABASE_STATE_TABLE)
+        .select('data')
+        .eq('id', SUPABASE_STATE_ID)
+        .maybeSingle();
+      if (error) throw error;
+      return new DatabaseStore((data?.data as DbSchema | null) || emptyDbSchema(), client, true);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error(`[DB] Supabase state load failed: ${message}`);
+      return new DatabaseStore(emptyDbSchema(), client, true, false, message.slice(0, 300));
+    }
+  }
+
+  private initialize(): void {
     this.normalizeApiKeyRoles();
-    if (this.data.workspaces.length === 0) {
+    if (this.data.workspaces.length === 0 && shouldSeedDemoData()) {
       this.seedDefaults();
     }
     this.normalizeVaults();
     if (shouldSeedDemoData()) {
       this.ensureDemoData();
     } else {
-      this.revokeDemoApiKeys();
+      this.purgeDemoData();
     }
     this.ensureBootstrapApiKey();
   }
@@ -174,9 +247,7 @@ class DatabaseStore {
     let changed = false;
     for (const key of this.data.apiKeys) {
       if (!key.role) {
-        key.role = key.id === 'key_demo' || key.name.toLowerCase().includes('bootstrap')
-          ? 'operator'
-          : 'agent';
+        key.role = key.name.toLowerCase().includes('bootstrap') ? 'operator' : 'agent';
         changed = true;
       }
     }
@@ -200,16 +271,15 @@ class DatabaseStore {
     const wsId = 'ws_default';
     const agentId = 'ag_demo';
     const vaultId = 'v_demo';
-    const demoKeyHash = crypto.createHash('sha256').update(DEMO_RAW_KEY).digest('hex');
-
-    if (!this.getApiKeyByHash(demoKeyHash)) {
+    const rawTestKey = testApiKey();
+    if (rawTestKey && !this.getApiKeyByHash(crypto.createHash('sha256').update(rawTestKey).digest('hex'))) {
       this.data.apiKeys.push({
-        id: 'key_demo',
+        id: 'key_test',
         workspaceId: wsId,
         agentId: agentId,
-        keyPrefix: 'pb_live_demo',
-        keyHash: demoKeyHash,
-        name: 'Demo Agent API Key',
+        keyPrefix: rawTestKey.substring(0, 12),
+        keyHash: crypto.createHash('sha256').update(rawTestKey).digest('hex'),
+        name: 'Test Operator API Key',
         role: 'operator',
         status: 'active',
         createdAt: new Date().toISOString()
@@ -259,7 +329,7 @@ class DatabaseStore {
     this.save();
   }
 
-  private load(): DbSchema {
+  private static loadFile(): DbSchema {
     try {
       if (fs.existsSync(DB_FILE)) {
         const content = fs.readFileSync(DB_FILE, 'utf-8');
@@ -268,20 +338,35 @@ class DatabaseStore {
     } catch (err) {
       console.warn('[DB] Failed to load db file, initializing clean database:', err);
     }
-    return {
-      workspaces: [],
-      users: [],
-      agents: [],
-      vaults: [],
-      managedSigners: [],
-      payees: [],
-      apiKeys: [],
-      paymentRequests: [],
-      chainEvents: []
-    };
+    return emptyDbSchema();
   }
 
   public save(): void {
+    if (this.remotePersistence && this.supabase) {
+      const client = this.supabase;
+      const snapshot = JSON.parse(JSON.stringify(this.data)) as DbSchema;
+      this.remoteSaveQueue = this.remoteSaveQueue
+        .then(async () => {
+          const { error } = await client
+            .from(SUPABASE_STATE_TABLE)
+            .upsert({
+              id: SUPABASE_STATE_ID,
+              data: snapshot,
+              updated_at: new Date().toISOString(),
+            }, { onConflict: 'id' });
+          if (error) throw error;
+          this.persistenceHealthy = true;
+          this.persistenceError = undefined;
+        })
+        .catch((error: unknown) => {
+          this.persistenceHealthy = false;
+          this.persistenceError = (error instanceof Error ? error.message : String(error)).slice(0, 300);
+          console.error(`[DB] Supabase state save failed: ${this.persistenceError}`);
+        });
+      return;
+    }
+
+    if (process.env.NODE_ENV === 'production') return;
     try {
       const dir = path.dirname(DB_FILE);
       if (!fs.existsSync(dir)) {
@@ -291,6 +376,26 @@ class DatabaseStore {
     } catch (err) {
       console.error('[DB] Save error:', err);
     }
+  }
+
+  public getPersistenceStatus(): PersistenceStatus {
+    if (this.remotePersistence) {
+      return {
+        provider: 'supabase',
+        configured: Boolean(this.supabase),
+        healthy: this.persistenceHealthy,
+        lastError: this.persistenceError,
+      };
+    }
+    if (process.env.NODE_ENV === 'production') {
+      return {
+        provider: 'unconfigured',
+        configured: false,
+        healthy: false,
+        lastError: this.persistenceError,
+      };
+    }
+    return { provider: 'file', configured: true, healthy: true };
   }
 
   public getOrCreateExternalWorkspace(externalAuthId: string, email: string): string {
@@ -393,17 +498,17 @@ class DatabaseStore {
       }
     );
 
-    if (shouldSeedDemoData()) {
-      const demoKeyHash = crypto.createHash('sha256').update(DEMO_RAW_KEY).digest('hex');
+    const rawTestKey = testApiKey();
+    if (rawTestKey) {
       this.data.apiKeys.push({
-        id: 'key_demo',
+        id: 'key_test',
         workspaceId: wsId,
         agentId: agentId,
-        keyPrefix: 'pb_live_demo',
-      keyHash: demoKeyHash,
-      name: 'Demo Agent API Key',
-      role: 'operator',
-      status: 'active',
+        keyPrefix: rawTestKey.substring(0, 12),
+        keyHash: crypto.createHash('sha256').update(rawTestKey).digest('hex'),
+        name: 'Test Operator API Key',
+        role: 'operator',
+        status: 'active',
         createdAt: new Date().toISOString()
       });
     }
@@ -411,13 +516,33 @@ class DatabaseStore {
     this.save();
   }
 
-  private revokeDemoApiKeys(): void {
+  private purgeDemoData(): void {
     let dirty = false;
-    for (const key of this.data.apiKeys) {
-      if (key.id === 'key_demo' || key.keyPrefix === 'pb_live_demo') {
-        key.status = 'revoked';
-        dirty = true;
-      }
+    const beforeKeys = this.data.apiKeys.length;
+    this.data.apiKeys = this.data.apiKeys.filter(key =>
+      key.id !== 'key_demo' && key.id !== 'key_test' && key.keyPrefix !== 'pb_live_demo'
+    );
+    dirty ||= beforeKeys !== this.data.apiKeys.length;
+    const beforeAgents = this.data.agents.length;
+    this.data.agents = this.data.agents.filter(agent => agent.id !== 'ag_demo');
+    dirty ||= beforeAgents !== this.data.agents.length;
+    const beforeVaults = this.data.vaults.length;
+    this.data.vaults = this.data.vaults.filter(vault => vault.id !== 'v_demo');
+    dirty ||= beforeVaults !== this.data.vaults.length;
+    const beforePayees = this.data.payees.length;
+    this.data.payees = this.data.payees.filter(payee => !['pay_x402_seller', 'pay_compute_node'].includes(payee.id));
+    dirty ||= beforePayees !== this.data.payees.length;
+    const beforeUsers = this.data.users.length;
+    this.data.users = this.data.users.filter(user => user.id !== 'u_admin' && user.email !== 'admin@peribolos.io');
+    dirty ||= beforeUsers !== this.data.users.length;
+    const defaultWorkspace = this.data.workspaces.find(workspace => workspace.id === 'ws_default');
+    if (defaultWorkspace && !this.data.users.some(user => user.workspaceId === defaultWorkspace.id)
+      && !this.data.agents.some(agent => agent.workspaceId === defaultWorkspace.id)
+      && !this.data.vaults.some(vault => vault.workspaceId === defaultWorkspace.id)
+      && !this.data.payees.some(payee => payee.workspaceId === defaultWorkspace.id)
+      && !this.data.apiKeys.some(key => key.workspaceId === defaultWorkspace.id)) {
+      this.data.workspaces = this.data.workspaces.filter(workspace => workspace.id !== defaultWorkspace.id);
+      dirty = true;
     }
     if (dirty) this.save();
   }
@@ -430,6 +555,15 @@ class DatabaseStore {
     const agentId = process.env.PERIBOLOS_BOOTSTRAP_AGENT_ID || 'ag_bootstrap';
     const keyHash = crypto.createHash('sha256').update(rawKey).digest('hex');
     if (this.getApiKeyByHash(keyHash)) return;
+
+    if (!this.data.workspaces.find(workspace => workspace.id === workspaceId)) {
+      this.data.workspaces.push({
+        id: workspaceId,
+        name: 'Bootstrap Workspace',
+        slug: workspaceId.replace(/^ws_/, '').toLowerCase(),
+        createdAt: new Date().toISOString()
+      });
+    }
 
     if (!this.data.agents.find(a => a.id === agentId)) {
       this.data.agents.push({
@@ -592,4 +726,4 @@ class DatabaseStore {
   }
 }
 
-export const db = new DatabaseStore();
+export const db = await DatabaseStore.create();

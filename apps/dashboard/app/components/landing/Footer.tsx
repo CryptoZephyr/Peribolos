@@ -1,13 +1,13 @@
 import Link from "next/link";
 import { FACTORY_ADDRESS, addressUrl } from "@/lib/chain";
-import { PeribolosLogo } from "@/app/components/PeribolosLogo";
+import { LandingBrand } from "./LandingBrand";
 
 export function Footer() {
   return (
-    <footer className="border-t border-line px-6 py-10">
-      <div className="mx-auto flex max-w-[1200px] flex-col items-start justify-between gap-4 text-sm text-text-faint sm:flex-row sm:items-center">
-        <PeribolosLogo size={22} showBadge={false} />
-        <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
+    <footer className="border-t border-line bg-surface-raised px-5 py-10 sm:px-8 font-sans">
+      <div className="mx-auto flex max-w-[1240px] flex-col items-start justify-between gap-6 text-xs text-text-faint sm:flex-row sm:items-center">
+        <LandingBrand />
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-2 font-medium">
           <a
             href={addressUrl(FACTORY_ADDRESS)}
             target="_blank"
@@ -16,13 +16,13 @@ export function Footer() {
           >
             Factory contract
           </a>
-          <Link href="/docs" className="transition-colors hover:text-text">
-            SDK docs
+          <a href="https://docs.arc.network" target="_blank" rel="noreferrer" className="transition-colors hover:text-text">
+            Arc docs
+          </a>
+          <Link href="/login" className="transition-colors hover:text-text">
+            Open workspace
           </Link>
-          <Link href="/education" className="transition-colors hover:text-text">
-            Education Center
-          </Link>
-          <span>Built on Arc testnet</span>
+          <span className="text-text-muted">Built on Arc testnet</span>
         </div>
       </div>
     </footer>

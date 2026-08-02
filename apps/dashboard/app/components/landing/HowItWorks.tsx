@@ -2,8 +2,8 @@ import { Reveal } from "./Reveal";
 
 export function HowItWorks() {
   return (
-    <section id="how" className="border-t border-line px-6 py-24 sm:py-32">
-      <div className="mx-auto max-w-[1200px]">
+    <section id="how" className="border-t border-line bg-[#fbfcfd] px-5 py-24 sm:px-8 sm:py-32">
+      <div className="mx-auto max-w-[1240px]">
         <Reveal>
           <h2 className="max-w-xl text-3xl font-medium leading-tight tracking-tight text-text sm:text-4xl">
             Two tiers, two enforcement models.
@@ -11,7 +11,7 @@ export function HowItWorks() {
         </Reveal>
 
         <div className="mt-12 grid gap-6 md:grid-cols-[3fr_2fr]">
-          <Reveal className="rounded-[12px] border border-line bg-surface-raised p-8">
+          <Reveal className="app-panel p-8">
             <span className="text-sm font-medium text-accent">Vault tier</span>
             <h3 className="mt-3 text-2xl font-medium text-text">
               Rule-enforced, on-chain
@@ -26,7 +26,7 @@ export function HowItWorks() {
             </p>
           </Reveal>
 
-          <Reveal className="rounded-[12px] border border-line bg-surface-raised p-8">
+          <Reveal className="app-panel p-8">
             <span className="text-sm font-medium text-text-faint">
               Petty-cash tier
             </span>

@@ -12,7 +12,17 @@ type AuthContextValue = {
   signInWithOtp: (email: string) => Promise<void>;
   signInWithWeb3: () => Promise<void>;
   signInWithPasskey: () => Promise<void>;
+  registerPasskey: () => Promise<void>;
+  listPasskeys: () => Promise<ActivePasskey[]>;
+  deletePasskey: (passkeyId: string) => Promise<void>;
   signOut: () => Promise<void>;
+};
+
+export type ActivePasskey = {
+  id: string;
+  friendly_name?: string | null;
+  created_at: string;
+  last_used_at?: string | null;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -24,18 +34,29 @@ export function SupabaseAuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!supabase) return;
     let active = true;
-    supabase.auth.getSession().then(({ data }) => {
-      if (active) {
-        setSession(data.session);
-        setLoading(false);
-      }
-    });
+    const fallbackTimer = window.setTimeout(() => {
+      if (active) setLoading(false);
+    }, 2500);
+
+    supabase.auth
+      .getSession()
+      .then(({ data }) => {
+        if (active) setSession(data.session);
+      })
+      .catch(() => {
+        if (active) setSession(null);
+      })
+      .finally(() => {
+        window.clearTimeout(fallbackTimer);
+        if (active) setLoading(false);
+      });
     const { data } = supabase.auth.onAuthStateChange((_event, next) => {
       setSession(next);
       setLoading(false);
     });
     return () => {
       active = false;
+      window.clearTimeout(fallbackTimer);
       data.subscription.unsubscribe();
     };
   }, []);
@@ -55,6 +76,9 @@ export function SupabaseAuthProvider({ children }: { children: ReactNode }) {
     },
     signInWithWeb3: async () => {
       if (!supabase) throw new Error("Supabase Auth is not configured for this dashboard.");
+      if (typeof window === "undefined" || !("ethereum" in window)) {
+        throw new Error("No Ethereum wallet detected. Open Peribolos in a browser with MetaMask, Rabby, or another injected wallet.");
+      }
       const { error } = await supabase.auth.signInWithWeb3({
         chain: "ethereum",
         statement: "Sign in to Peribolos to manage rule-enforced agent vaults.",
@@ -63,7 +87,29 @@ export function SupabaseAuthProvider({ children }: { children: ReactNode }) {
     },
     signInWithPasskey: async () => {
       if (!supabase) throw new Error("Supabase Auth is not configured for this dashboard.");
+      if (typeof window === "undefined" || typeof window.PublicKeyCredential === "undefined" || !navigator.credentials) {
+        throw new Error("Passkeys are not available in this browser. Use a secure, passkey-capable browser on a device with Windows Hello, Touch ID, or another passkey manager.");
+      }
       const { error } = await supabase.auth.signInWithPasskey();
+      if (error) throw error;
+    },
+    registerPasskey: async () => {
+      if (!supabase) throw new Error("Supabase Auth is not configured for this dashboard.");
+      if (typeof window === "undefined" || typeof window.PublicKeyCredential === "undefined" || !navigator.credentials) {
+        throw new Error("Passkeys are not available in this browser. Use a secure, passkey-capable browser on a device with Windows Hello, Touch ID, or another passkey manager.");
+      }
+      const { error } = await supabase.auth.registerPasskey();
+      if (error) throw error;
+    },
+    listPasskeys: async () => {
+      if (!supabase) throw new Error("Supabase Auth is not configured for this dashboard.");
+      const { data, error } = await supabase.auth.passkey.list();
+      if (error) throw error;
+      return data ?? [];
+    },
+    deletePasskey: async (passkeyId) => {
+      if (!supabase) throw new Error("Supabase Auth is not configured for this dashboard.");
+      const { error } = await supabase.auth.passkey.delete({ passkeyId });
       if (error) throw error;
     },
     signOut: async () => {

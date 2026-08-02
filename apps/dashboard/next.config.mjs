@@ -5,8 +5,6 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // Static export: no server anywhere in Peribolos. Deployable to any static host.
-  output: "export",
   images: { unoptimized: true },
   // Pin monorepo root so Next does not walk up to C:\Users\HomePC\package-lock.json
   outputFileTracingRoot: path.join(__dirname, "../.."),
@@ -43,4 +41,3 @@ const nextConfig = {
 };
 
 export default nextConfig;
-

@@ -12,7 +12,7 @@ import {
 } from "@phosphor-icons/react";
 import { formatUsdc, txUrl } from "@/lib/chain";
 import { describeError } from "@/lib/errors";
-import { vaultAbi } from "./useVault";
+import { vaultAbi } from "./contractAbis";
 import { useSession } from "../session";
 
 export function OwnerControls({

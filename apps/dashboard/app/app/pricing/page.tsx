@@ -6,7 +6,7 @@ export default function PricingPage() {
   return (
     <div className="space-y-8">
       <div className="text-center max-w-2xl mx-auto space-y-3 border-b border-line pb-6">
-        <h1 className="text-3xl font-extrabold tracking-tight text-text">Transparent Startup Pricing</h1>
+        <h1 className="text-3xl font-semibold tracking-tight text-text">Plans for testing and production</h1>
         <p className="text-sm text-text-muted">
           Give your autonomous AI agents safe spending power with contract-level financial enforcement.
         </p>
@@ -17,7 +17,7 @@ export default function PricingPage() {
         <div className="rounded-xl border border-line bg-surface-raised p-6 space-y-6 flex flex-col justify-between">
           <div className="space-y-4">
             <div>
-              <span className="rounded bg-surface px-2.5 py-1 text-[10px] font-bold text-text-muted uppercase border border-line">Developer</span>
+              <span className="rounded bg-surface px-2.5 py-1 text-[10px] font-semibold text-text-muted border border-line">Developer</span>
               <h3 className="text-xl font-bold text-text mt-3">Free</h3>
               <p className="text-xs text-text-muted mt-1">For hacking, testing, & local agent development.</p>
             </div>
@@ -44,7 +44,7 @@ export default function PricingPage() {
           </div>
           <div className="space-y-4">
             <div>
-              <span className="rounded bg-accent/20 px-2.5 py-1 text-[10px] font-bold text-accent uppercase">Startup Pro</span>
+              <span className="rounded bg-accent/20 px-2.5 py-1 text-[10px] font-semibold text-accent">Startup Pro</span>
               <h3 className="text-xl font-bold text-text mt-3">Pro</h3>
               <p className="text-xs text-text-muted mt-1">For teams deploying production agents with real budgets.</p>
             </div>
@@ -60,9 +60,12 @@ export default function PricingPage() {
             </ul>
           </div>
 
-          <button onClick={() => alert("Redirecting to Stripe Billing Checkout...")} className="w-full text-center rounded-md bg-accent py-2.5 text-xs font-semibold text-white hover:opacity-90 shadow-sm">
-            Upgrade to Pro
-          </button>
+          <a
+            href="mailto:security@peribolos.io?subject=Peribolos%20Pro%20access"
+            className="w-full text-center rounded-md bg-accent py-2.5 text-xs font-semibold text-white hover:bg-accent-deep shadow-sm"
+          >
+            Talk to us about Pro
+          </a>
         </div>
 
         {/* Team Enterprise Tier */}
@@ -84,9 +87,12 @@ export default function PricingPage() {
             </ul>
           </div>
 
-          <button onClick={() => alert("Contacting sales team...")} className="w-full text-center rounded-md border border-line bg-surface py-2.5 text-xs font-semibold text-text hover:bg-surface/80">
-            Contact Sales
-          </button>
+          <a
+            href="mailto:security@peribolos.io?subject=Peribolos%20Team%20plan"
+            className="w-full text-center rounded-md border border-line bg-surface py-2.5 text-xs font-semibold text-text hover:bg-surface/80"
+          >
+            Contact the team
+          </a>
         </div>
       </div>
     </div>

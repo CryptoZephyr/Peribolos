@@ -1,23 +1,26 @@
+"use client";
+
 import { Reveal } from "./Reveal";
+import { Code, Fingerprint, ShieldCheck, Wallet } from "@phosphor-icons/react";
 
 const POINTS = [
   {
-    index: "01",
+    icon: ShieldCheck,
     title: "On-chain enforcement",
-    body: "The allowlist and caps are contract state, not application logic. Nothing server-side can be tricked, because there is no server in the loop.",
+    body: "The allowlist and caps are contract state, not a prompt rule. A payment must satisfy them before value can move.",
   },
   {
-    index: "02",
-    title: "No backend to breach",
-    body: "The dashboard is a static export that reads chain events directly. No database, no user table, no API server to leak.",
+    icon: Wallet,
+    title: "Limits that stay attached",
+    body: "Daily and per-transaction ceilings travel with the vault, so every agent works inside an intentional budget.",
   },
   {
-    index: "03",
+    icon: Fingerprint,
     title: "ERC-8004 identity",
     body: "Every vault mints the agent an on-chain identity NFT at creation, so who is spending is verifiable, not just claimed by the client.",
   },
   {
-    index: "04",
+    icon: Code,
     title: "Ten-line SDK",
     body: "createPeribolosTools() drops three tools into an existing LangChain agent. No rewrite, no new infrastructure to run.",
   },
@@ -25,8 +28,8 @@ const POINTS = [
 
 export function Defensible() {
   return (
-    <section className="border-t border-line px-6 py-24 sm:py-32">
-      <div className="mx-auto max-w-[1200px]">
+    <section className="border-t border-line px-5 py-24 sm:px-8 sm:py-32">
+      <div className="mx-auto max-w-[1240px]">
         <Reveal>
           <h2 className="max-w-xl text-3xl font-medium leading-tight tracking-tight text-text sm:text-4xl">
             What makes it hard to argue with.
@@ -35,10 +38,10 @@ export function Defensible() {
 
         <div className="mt-14 max-w-3xl">
           {POINTS.map((point) => (
-            <Reveal key={point.index}>
-              <div className="grid grid-cols-[3.5rem_1fr] gap-6 border-t border-line py-8 first:border-t-0 sm:grid-cols-[5rem_1fr]">
-                <span className="font-mono text-sm text-text-faint">
-                  {point.index}
+            <Reveal key={point.title}>
+              <div className="grid grid-cols-[2.5rem_1fr] gap-5 border-t border-line py-8 first:border-t-0 sm:grid-cols-[3.5rem_1fr]">
+                <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent-tint text-accent">
+                  <point.icon size={17} weight="bold" aria-hidden />
                 </span>
                 <div>
                   <h3 className="text-lg font-medium text-text">
