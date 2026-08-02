@@ -58,7 +58,7 @@ export async function fetchApi<T>(endpoint: string, options: RequestInit = {}): 
       window.dispatchEvent(new Event('peribolos-api-key-invalid'));
     }
     const errorBody = await res.json().catch(() => ({ message: res.statusText }));
-    throw new Error(errorBody.message || `API error ${res.status}`);
+    throw new Error(errorBody.message || errorBody.blockReasonDescription || errorBody.blockReasonCode || `API error ${res.status}`);
   }
 
   return res.json() as Promise<T>;

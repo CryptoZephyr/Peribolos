@@ -6,6 +6,7 @@ import { fetchApi } from "@/lib/api-client";
 import { SkeletonCard, SkeletonTableRows } from "@/app/components/Skeleton";
 import { ExplorerBadge } from "@/app/components/ExplorerBadge";
 import { OnboardingWizard } from "@/app/components/OnboardingWizard";
+import { PaymentRequestPanel } from "@/app/app/components/PaymentRequestPanel";
 import { ArrowRight, ShieldCheck, Wallet } from "@phosphor-icons/react";
 
 export default function DashboardOverviewPage() {
@@ -182,6 +183,8 @@ export default function DashboardOverviewPage() {
       )}
 
       {!setupComplete && <OnboardingWizard state={onboardingState} />}
+
+      <PaymentRequestPanel />
 
       <div className="grid gap-5 xl:grid-cols-[1.5fr_0.8fr]">
       <section className="app-panel space-y-5 p-5 sm:p-6">
