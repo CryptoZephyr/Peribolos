@@ -12,7 +12,7 @@ The repository contains the Arc testnet contracts, a hosted payment API, a web c
 - API health: [peribolos-api.onrender.com/health](https://peribolos-api.onrender.com/health)
 - License: [MIT](LICENSE)
 
-This is a testnet product. Do not use it for production funds without configuring durable storage, rotating all deployment secrets, and reviewing the contract and operational controls for your environment.
+This is a testnet product. Do not use it for production funds without rotating all deployment secrets and reviewing the contract and operational controls for your environment.
 
 ## What it protects
 
@@ -184,10 +184,12 @@ Production requires:
 - `CIRCLE_WALLET_SET_ID`
 - `SIGNER_ENCRYPTION_KEY`
 - `SUPABASE_URL` and `SUPABASE_ANON_KEY` (or the `NEXT_PUBLIC_*` equivalents)
+- `SUPABASE_SERVICE_ROLE_KEY` for server-only state persistence
 - `CORS_ORIGIN`
-- `PERIBOLOS_DB_FILE` backed by durable storage
 
-`/health` confirms that the process is running. `/ready` is the stricter check and reports whether the service has the credentials and persistence configuration required for hosted operations.
+Run `apps/api/src/db/schema.sql` in the Supabase SQL editor before the first production start. The API stores its current state snapshot in the locked-down `peribolos_state` table. The service-role key is used only by the API and must never be exposed to the dashboard.
+
+`/health` confirms that the process is running. `/ready` is the stricter check and reports whether the service has the credentials and Supabase persistence required for hosted operations.
 
 ## Tests and checks
 

@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
 export interface Workspace {
   id: string;
@@ -146,6 +147,8 @@ export interface DbSchema {
 }
 
 export const DB_FILE = process.env.PERIBOLOS_DB_FILE || path.join(process.cwd(), 'data', 'db.json');
+const SUPABASE_STATE_TABLE = 'peribolos_state';
+const SUPABASE_STATE_ID = 'primary';
 
 function shouldSeedDemoData(): boolean {
   return process.env.NODE_ENV === 'test'
@@ -156,11 +159,77 @@ function testApiKey(): string | undefined {
   return process.env.NODE_ENV === 'test' ? process.env.PERIBOLOS_TEST_API_KEY?.trim() : undefined;
 }
 
+function emptyDbSchema(): DbSchema {
+  return {
+    workspaces: [],
+    users: [],
+    agents: [],
+    vaults: [],
+    managedSigners: [],
+    payees: [],
+    apiKeys: [],
+    paymentRequests: [],
+    chainEvents: []
+  };
+}
+
+export type PersistenceStatus = {
+  provider: 'supabase' | 'file' | 'unconfigured';
+  configured: boolean;
+  healthy: boolean;
+  lastError?: string;
+};
+
 class DatabaseStore {
   private data: DbSchema;
+  private readonly supabase: SupabaseClient | null;
+  private readonly remotePersistence: boolean;
+  private persistenceHealthy: boolean;
+  private persistenceError?: string;
+  private remoteSaveQueue: Promise<void> = Promise.resolve();
 
-  constructor() {
-    this.data = this.load();
+  private constructor(data: DbSchema, supabase: SupabaseClient | null, remotePersistence: boolean, persistenceHealthy = true, persistenceError?: string) {
+    this.data = data;
+    this.supabase = supabase;
+    this.remotePersistence = remotePersistence;
+    this.persistenceHealthy = persistenceHealthy;
+    this.persistenceError = persistenceError;
+    this.initialize();
+  }
+
+  public static async create(): Promise<DatabaseStore> {
+    const supabaseUrl = (process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL)?.trim();
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
+    const wantsRemote = process.env.NODE_ENV === 'production' || process.env.PERIBOLOS_USE_SUPABASE === '1';
+
+    if (!wantsRemote) {
+      return new DatabaseStore(DatabaseStore.loadFile(), null, false);
+    }
+
+    if (!supabaseUrl || !serviceRoleKey) {
+      console.error('[DB] Supabase persistence is not configured. Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY.');
+      return new DatabaseStore(emptyDbSchema(), null, false, false, 'SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required.');
+    }
+
+    const client = createClient(supabaseUrl, serviceRoleKey, {
+      auth: { persistSession: false, autoRefreshToken: false }
+    });
+    try {
+      const { data, error } = await client
+        .from(SUPABASE_STATE_TABLE)
+        .select('data')
+        .eq('id', SUPABASE_STATE_ID)
+        .maybeSingle();
+      if (error) throw error;
+      return new DatabaseStore((data?.data as DbSchema | null) || emptyDbSchema(), client, true);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error(`[DB] Supabase state load failed: ${message}`);
+      return new DatabaseStore(emptyDbSchema(), client, true, false, message.slice(0, 300));
+    }
+  }
+
+  private initialize(): void {
     this.normalizeApiKeyRoles();
     if (this.data.workspaces.length === 0 && shouldSeedDemoData()) {
       this.seedDefaults();
@@ -260,7 +329,7 @@ class DatabaseStore {
     this.save();
   }
 
-  private load(): DbSchema {
+  private static loadFile(): DbSchema {
     try {
       if (fs.existsSync(DB_FILE)) {
         const content = fs.readFileSync(DB_FILE, 'utf-8');
@@ -269,20 +338,35 @@ class DatabaseStore {
     } catch (err) {
       console.warn('[DB] Failed to load db file, initializing clean database:', err);
     }
-    return {
-      workspaces: [],
-      users: [],
-      agents: [],
-      vaults: [],
-      managedSigners: [],
-      payees: [],
-      apiKeys: [],
-      paymentRequests: [],
-      chainEvents: []
-    };
+    return emptyDbSchema();
   }
 
   public save(): void {
+    if (this.remotePersistence && this.supabase) {
+      const client = this.supabase;
+      const snapshot = JSON.parse(JSON.stringify(this.data)) as DbSchema;
+      this.remoteSaveQueue = this.remoteSaveQueue
+        .then(async () => {
+          const { error } = await client
+            .from(SUPABASE_STATE_TABLE)
+            .upsert({
+              id: SUPABASE_STATE_ID,
+              data: snapshot,
+              updated_at: new Date().toISOString(),
+            }, { onConflict: 'id' });
+          if (error) throw error;
+          this.persistenceHealthy = true;
+          this.persistenceError = undefined;
+        })
+        .catch((error: unknown) => {
+          this.persistenceHealthy = false;
+          this.persistenceError = (error instanceof Error ? error.message : String(error)).slice(0, 300);
+          console.error(`[DB] Supabase state save failed: ${this.persistenceError}`);
+        });
+      return;
+    }
+
+    if (process.env.NODE_ENV === 'production') return;
     try {
       const dir = path.dirname(DB_FILE);
       if (!fs.existsSync(dir)) {
@@ -292,6 +376,26 @@ class DatabaseStore {
     } catch (err) {
       console.error('[DB] Save error:', err);
     }
+  }
+
+  public getPersistenceStatus(): PersistenceStatus {
+    if (this.remotePersistence) {
+      return {
+        provider: 'supabase',
+        configured: Boolean(this.supabase),
+        healthy: this.persistenceHealthy,
+        lastError: this.persistenceError,
+      };
+    }
+    if (process.env.NODE_ENV === 'production') {
+      return {
+        provider: 'unconfigured',
+        configured: false,
+        healthy: false,
+        lastError: this.persistenceError,
+      };
+    }
+    return { provider: 'file', configured: true, healthy: true };
   }
 
   public getOrCreateExternalWorkspace(externalAuthId: string, email: string): string {
@@ -622,4 +726,4 @@ class DatabaseStore {
   }
 }
 
-export const db = new DatabaseStore();
+export const db = await DatabaseStore.create();

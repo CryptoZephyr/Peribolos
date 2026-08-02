@@ -4,6 +4,7 @@ import rateLimit from 'express-rate-limit';
 import { v1Router } from './routes/v1.js';
 import { eventIndexer } from './services/indexer.js';
 import { signerService } from './services/signer.js';
+import { db } from './db/store.js';
 
 const app = express();
 const PORT = process.env.PORT || 3400;
@@ -66,6 +67,7 @@ app.get('/health', (_req, res) => {
 app.get('/ready', (_req, res) => {
   const production = process.env.NODE_ENV === 'production';
   const signer = signerService.getReadiness();
+  const persistence = db.getPersistenceStatus();
   const checks = {
     signer: !production || (signer.provider === 'circle-dcw' && signer.circle.configured && !signer.circle.disabled),
     encryption: !production || Boolean(process.env.SIGNER_ENCRYPTION_KEY?.trim()),
@@ -73,7 +75,7 @@ app.get('/ready', (_req, res) => {
       (process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL)?.trim()
       && (process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)?.trim()
     ),
-    persistence: !production || Boolean(process.env.PERIBOLOS_DB_FILE?.trim()),
+    persistence: !production || (persistence.provider === 'supabase' && persistence.configured && persistence.healthy),
   };
   const ready = Object.values(checks).every(Boolean);
   return res.status(ready ? 200 : 503).json({
@@ -85,6 +87,7 @@ app.get('/ready', (_req, res) => {
       circleConfigured: signer.circle.configured,
       localFallbackEnabled: signer.localFallbackEnabled,
     },
+    persistence,
   });
 });
 
@@ -109,8 +112,8 @@ function validateProductionConfiguration(): void {
   if (missing.length > 0) {
     throw new Error(`Production configuration is incomplete: ${missing.join('; ')}`);
   }
-  if (!process.env.PERIBOLOS_DB_FILE?.trim()) {
-    console.warn('[API] PERIBOLOS_DB_FILE is not set; JSON state is not guaranteed to survive a Render restart.');
+  if (db.getPersistenceStatus().provider !== 'supabase' || !process.env.SUPABASE_SERVICE_ROLE_KEY?.trim()) {
+    console.warn('[API] SUPABASE_SERVICE_ROLE_KEY is not set; production readiness will remain unavailable.');
   }
 }
 
