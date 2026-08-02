@@ -34,6 +34,7 @@ import {
 import { ActionType, PERIBOLOS_FACTORY_ADDRESS } from "@peribolos/core";
 import { addressUrl, txUrl, publicClient } from "@/lib/chain";
 import { describeError } from "@/lib/errors";
+import { readWorkspaceSettings, WORKSPACE_SETTINGS_CHANGED_EVENT } from "@/lib/workspace-settings";
 import { factoryAbi } from "./contractAbis";
 import { useSession } from "../session";
 
@@ -71,8 +72,8 @@ export function CreateDomainWizard({
   const [copied, setCopied] = useState(false);
 
   const [allowlist, setAllowlist] = useState<string[]>([""]);
-  const [perTxCap, setPerTxCap] = useState("2");
-  const [dailyCap, setDailyCap] = useState("5");
+  const [perTxCap, setPerTxCap] = useState(() => readWorkspaceSettings().defaultPerTxCap);
+  const [dailyCap, setDailyCap] = useState(() => readWorkspaceSettings().defaultDailyCap);
   const [floatAmount, setFloatAmount] = useState("1");
   const [fundAmount, setFundAmount] = useState("3");
   const [agentGas, setAgentGas] = useState("0.5");
@@ -101,6 +102,7 @@ export function CreateDomainWizard({
   const [createdVault, setCreatedVault] = useState<Address | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [envCopied, setEnvCopied] = useState(false);
+  const [linking, setLinking] = useState(false);
 
   useEffect(() => {
     if (initialAgentAddress && isAddress(initialAgentAddress)) {
@@ -108,6 +110,16 @@ export function CreateDomainWizard({
       setPastedAgent(initialAgentAddress);
     }
   }, [initialAgentAddress]);
+
+  useEffect(() => {
+    const syncDefaults = () => {
+      const settings = readWorkspaceSettings();
+      setPerTxCap(settings.defaultPerTxCap);
+      setDailyCap(settings.defaultDailyCap);
+    };
+    window.addEventListener(WORKSPACE_SETTINGS_CHANGED_EVENT, syncDefaults);
+    return () => window.removeEventListener(WORKSPACE_SETTINGS_CHANGED_EVENT, syncDefaults);
+  }, []);
 
   const canSubmit =
     isConnected &&
@@ -216,11 +228,11 @@ export function CreateDomainWizard({
         <div>
           <div className="flex items-center gap-2 text-sm font-semibold text-accent">
             <ShieldCheck size={18} weight="bold" />
-            Domain created
+            Vault created
           </div>
           <p className="mt-2 text-sm text-text-muted">
-            Your vault is live on Arc testnet and the agent is registered in the ERC-8004 identity
-            registry. Rules are already enforcing.
+            The contract is live on Arc testnet. Your spending rules are already enforcing; link it
+            below so this workspace can show its balance and history.
           </p>
         </div>
 
@@ -275,17 +287,23 @@ export function CreateDomainWizard({
         </div>
 
         <button
-          onClick={() => {
+          onClick={async () => {
             if (owner && agentAddress) {
-              onCreated(createdVault, {
-                ownerAddress: owner as Address,
-                agentSignerAddress: agentAddress,
-              });
+              setLinking(true);
+              try {
+                await onCreated(createdVault, {
+                  ownerAddress: owner as Address,
+                  agentSignerAddress: agentAddress,
+                });
+              } finally {
+                setLinking(false);
+              }
             }
           }}
+          disabled={linking}
           className="rounded-full bg-accent px-4 py-2 text-sm font-medium text-surface transition-colors hover:bg-accent-deep"
         >
-          Open this vault
+          {linking ? "Linking vault…" : "Link vault to workspace"}
         </button>
       </div>
     );
@@ -418,6 +436,9 @@ export function CreateDomainWizard({
 
         {/* Caps */}
         <section className="grid grid-cols-2 gap-4">
+          <div className="col-span-2 rounded-lg border border-accent/20 bg-accent/5 px-3 py-2 text-xs text-text-muted">
+            Using workspace defaults: <span className="font-mono text-text">${dailyCap} daily</span> and <span className="font-mono text-text">${perTxCap} per transaction</span>. You can adjust them before deployment.
+          </div>
           <div>
             <label className="text-sm font-medium text-text">Per-transaction cap</label>
             <div className="mt-2 flex items-center gap-2">

@@ -15,8 +15,11 @@ import {
 import { useToast } from "@/app/components/Toast";
 import { useSupabaseAuth } from "@/app/auth/SupabaseAuthProvider";
 import { rpcUrl } from "@/lib/chain";
-
-const SETTINGS_STORAGE_KEY = "peribolos.workspace-settings.v1";
+import {
+  DEFAULT_WORKSPACE_SETTINGS,
+  saveWorkspaceSettings,
+  readWorkspaceSettings,
+} from "@/lib/workspace-settings";
 
 export default function WorkspaceSettingsPage() {
   const toast = useToast();
@@ -24,11 +27,11 @@ export default function WorkspaceSettingsPage() {
   const [activeTab, setActiveTab] = useState<"general" | "security" | "network" | "webhooks">("general");
 
   // Form states
-  const [workspaceName, setWorkspaceName] = useState("Arc Primary Workspace");
-  const [defaultDailyCap, setDefaultDailyCap] = useState("100");
-  const [defaultPerTxCap, setDefaultPerTxCap] = useState("25");
-  const [require2FA, setRequire2FA] = useState(true);
-  const [autoPauseOnAnomaly, setAutoPauseOnAnomaly] = useState(true);
+  const [workspaceName, setWorkspaceName] = useState(DEFAULT_WORKSPACE_SETTINGS.workspaceName);
+  const [defaultDailyCap, setDefaultDailyCap] = useState(DEFAULT_WORKSPACE_SETTINGS.defaultDailyCap);
+  const [defaultPerTxCap, setDefaultPerTxCap] = useState(DEFAULT_WORKSPACE_SETTINGS.defaultPerTxCap);
+  const [require2FA, setRequire2FA] = useState(DEFAULT_WORKSPACE_SETTINGS.require2FA);
+  const [autoPauseOnAnomaly, setAutoPauseOnAnomaly] = useState(DEFAULT_WORKSPACE_SETTINGS.autoPauseOnAnomaly);
   const [rpcEndpoint, setRpcEndpoint] = useState(rpcUrl);
   const [webhookUrl, setWebhookUrl] = useState("");
   const [saving, setSaving] = useState(false);
@@ -60,19 +63,14 @@ export default function WorkspaceSettingsPage() {
   }, [activeTab, configured, session]);
 
   useEffect(() => {
-    try {
-      const saved = JSON.parse(localStorage.getItem(SETTINGS_STORAGE_KEY) || "null");
-      if (!saved) return;
-      if (typeof saved.workspaceName === "string") setWorkspaceName(saved.workspaceName);
-      if (typeof saved.defaultDailyCap === "string") setDefaultDailyCap(saved.defaultDailyCap);
-      if (typeof saved.defaultPerTxCap === "string") setDefaultPerTxCap(saved.defaultPerTxCap);
-      if (typeof saved.require2FA === "boolean") setRequire2FA(saved.require2FA);
-      if (typeof saved.autoPauseOnAnomaly === "boolean") setAutoPauseOnAnomaly(saved.autoPauseOnAnomaly);
-      if (typeof saved.rpcEndpoint === "string") setRpcEndpoint(saved.rpcEndpoint);
-      if (typeof saved.webhookUrl === "string") setWebhookUrl(saved.webhookUrl);
-    } catch {
-      // Ignore malformed local preferences and keep safe defaults.
-    }
+    const saved = readWorkspaceSettings();
+    setWorkspaceName(saved.workspaceName);
+    setDefaultDailyCap(saved.defaultDailyCap);
+    setDefaultPerTxCap(saved.defaultPerTxCap);
+    setRequire2FA(saved.require2FA);
+    setAutoPauseOnAnomaly(saved.autoPauseOnAnomaly);
+    setRpcEndpoint(saved.rpcEndpoint || rpcUrl);
+    setWebhookUrl(saved.webhookUrl);
   }, []);
 
   async function handleRegisterPasskey() {
@@ -94,12 +92,9 @@ export default function WorkspaceSettingsPage() {
   function handleSave(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
-    localStorage.setItem(
-      SETTINGS_STORAGE_KEY,
-      JSON.stringify({ workspaceName, defaultDailyCap, defaultPerTxCap, require2FA, autoPauseOnAnomaly, rpcEndpoint, webhookUrl }),
-    );
+    saveWorkspaceSettings({ workspaceName, defaultDailyCap, defaultPerTxCap, require2FA, autoPauseOnAnomaly, rpcEndpoint, webhookUrl });
     setSaving(false);
-    toast.success("Preferences saved", "These workspace defaults are saved on this browser.");
+    toast.success("Preferences saved", "New vaults will use these caps in this browser.");
   }
 
   return (
