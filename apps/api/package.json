@@ -9,7 +9,7 @@
     "dev": "tsx watch src/server.ts",
     "start": "node dist/server.js",
     "typecheck": "tsc --noEmit",
-    "test": "tsx --test --test-force-exit test/api.test.ts"
+    "test": "tsx --test --import ./test/setup.ts --test-force-exit test/api.test.ts"
   },
   "dependencies": {
     "@circle-fin/developer-controlled-wallets": "^10.8.0",

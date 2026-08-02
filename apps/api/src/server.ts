@@ -3,7 +3,7 @@ import cors from 'cors';
 import rateLimit from 'express-rate-limit';
 import { v1Router } from './routes/v1.js';
 import { eventIndexer } from './services/indexer.js';
-import { db } from './db/store.js';
+import { signerService } from './services/signer.js';
 
 const app = express();
 const PORT = process.env.PORT || 3400;
@@ -60,8 +60,61 @@ app.get('/health', (_req, res) => {
   });
 });
 
+// Readiness is intentionally stricter than liveness. Render and operators can
+// distinguish an online process from a service that is safe to provision and
+// execute payments with.
+app.get('/ready', (_req, res) => {
+  const production = process.env.NODE_ENV === 'production';
+  const signer = signerService.getReadiness();
+  const checks = {
+    signer: !production || (signer.provider === 'circle-dcw' && signer.circle.configured && !signer.circle.disabled),
+    encryption: !production || Boolean(process.env.SIGNER_ENCRYPTION_KEY?.trim()),
+    supabase: !production || Boolean(
+      (process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL)?.trim()
+      && (process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)?.trim()
+    ),
+    persistence: !production || Boolean(process.env.PERIBOLOS_DB_FILE?.trim()),
+  };
+  const ready = Object.values(checks).every(Boolean);
+  return res.status(ready ? 200 : 503).json({
+    status: ready ? 'ready' : 'not_ready',
+    service: 'peribolos-api',
+    checks,
+    signer: {
+      provider: signer.provider,
+      circleConfigured: signer.circle.configured,
+      localFallbackEnabled: signer.localFallbackEnabled,
+    },
+  });
+});
+
 // API Routes V1
 app.use('/v1', v1Router);
+
+function validateProductionConfiguration(): void {
+  if (process.env.NODE_ENV !== 'production') return;
+  const signer = signerService.getReadiness();
+  const missing: string[] = [];
+  if (signer.provider !== 'circle-dcw' || signer.circle.disabled) {
+    missing.push('CIRCLE_API_KEY, ENTITY_SECRET, CIRCLE_WALLET_SET_ID');
+  }
+  if (!process.env.SIGNER_ENCRYPTION_KEY?.trim()) missing.push('SIGNER_ENCRYPTION_KEY');
+  if (!(
+    (process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL)?.trim()
+    && (process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)?.trim()
+  )) {
+    missing.push('SUPABASE_URL and SUPABASE_ANON_KEY');
+  }
+  if (!process.env.CORS_ORIGIN?.trim()) missing.push('CORS_ORIGIN');
+  if (missing.length > 0) {
+    throw new Error(`Production configuration is incomplete: ${missing.join('; ')}`);
+  }
+  if (!process.env.PERIBOLOS_DB_FILE?.trim()) {
+    console.warn('[API] PERIBOLOS_DB_FILE is not set; JSON state is not guaranteed to survive a Render restart.');
+  }
+}
+
+validateProductionConfiguration();
 
 // Global Error Handler — catches unhandled errors, prevents process crash
 app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
@@ -83,29 +136,10 @@ if (!isTestRuntime) {
   eventIndexer.start();
 }
 
-// Ensure demo API key is seeded for instant testing
-const demoKeyRaw = 'pb_live_demo1234567890abcdef1234567890abcdef';
-const crypto = await import('node:crypto');
-const demoKeyHash = crypto.createHash('sha256').update(demoKeyRaw).digest('hex');
-
-if (!db.getApiKeyByHash(demoKeyHash)) {
-  db.addApiKey({
-    id: 'key_demo',
-    workspaceId: 'ws_default',
-    agentId: 'ag_demo',
-    keyPrefix: demoKeyRaw.substring(0, 12),
-    keyHash: demoKeyHash,
-    name: 'Demo Agent API Key',
-    status: 'active',
-    createdAt: new Date().toISOString()
-  });
-}
-
 let server: any;
 if (process.env.NODE_ENV !== 'test' && (!process.argv[1] || process.argv[1].endsWith('server.ts') || process.argv[1].endsWith('server.js'))) {
   server = app.listen(PORT, () => {
     console.log(`🚀 Peribolos V2 Backend API listening on http://localhost:${PORT}`);
-    console.log(`🔑 Demo API Key for testing: ${demoKeyRaw}`);
   });
 }
 

@@ -10,19 +10,20 @@ import {
   type CircleDeveloperControlledWalletsClient,
 } from '@circle-fin/developer-controlled-wallets';
 
-// Load the API-local env before constructing the signer singleton.
-dotenv.config({ path: fileURLToPath(new URL('../../.env', import.meta.url)) });
+// Load the API-local env only for local development and tests. Production
+// secrets must come from the hosting environment, never from a packaged file.
+if (process.env.NODE_ENV !== 'production') {
+  dotenv.config({ path: fileURLToPath(new URL('../../.env', import.meta.url)) });
+}
 
 const ENCRYPTION_ALGORITHM = 'aes-256-gcm';
-const DEV_KEY_SECRET = 'peribolos-v2-dev-signer-master-secret-key-32b!';
 
-// Ensure key is exactly 32 bytes
 function getSecretKey(): Buffer {
   const configured = process.env.SIGNER_ENCRYPTION_KEY?.trim();
-  if (!configured && process.env.NODE_ENV === 'production') {
-    throw new Error('SIGNER_ENCRYPTION_KEY is required in production.');
+  if (!configured) {
+    throw new Error('SIGNER_ENCRYPTION_KEY is required to encrypt managed signer keys.');
   }
-  return crypto.createHash('sha256').update(configured || DEV_KEY_SECRET).digest();
+  return crypto.createHash('sha256').update(configured).digest();
 }
 
 export function encryptPrivateKey(privateKeyHex: string): { encryptedPrivateKey: string; iv: string; authTag: string } {
@@ -134,7 +135,8 @@ export class ManagedSignerService {
         ? 'CIRCLE_ENTITY_SECRET'
         : undefined;
     this.circleWalletSetId = readTrimmedEnv('CIRCLE_WALLET_SET_ID');
-    this.circleDisabled = process.env.NODE_ENV === 'test' || readTrimmedEnv('PERIBOLOS_DISABLE_CIRCLE_DCW') === '1';
+    this.circleDisabled = process.env.NODE_ENV === 'test'
+      || (process.env.NODE_ENV !== 'production' && readTrimmedEnv('PERIBOLOS_DISABLE_CIRCLE_DCW') === '1');
     if (!this.circleDisabled && apiKey && entitySecret) {
       this.circleClient = initiateDeveloperControlledWalletsClient({ apiKey, entitySecret });
       if (!this.circleWalletSetId) {
@@ -156,7 +158,7 @@ export class ManagedSignerService {
     const configured = missingEnv.length === 0;
     const activeCircle = configured && !this.circleDisabled;
     const localFallbackEnabled = process.env.NODE_ENV === 'test'
-      || readTrimmedEnv('PERIBOLOS_ENABLE_LOCAL_SIGNER') === '1';
+      || (process.env.NODE_ENV !== 'production' && readTrimmedEnv('PERIBOLOS_ENABLE_LOCAL_SIGNER') === '1');
 
     return {
       network: {
@@ -307,7 +309,7 @@ export class ManagedSignerService {
     }
 
     const localFallbackEnabled = process.env.NODE_ENV === 'test'
-      || readTrimmedEnv('PERIBOLOS_ENABLE_LOCAL_SIGNER') === '1';
+      || (process.env.NODE_ENV !== 'production' && readTrimmedEnv('PERIBOLOS_ENABLE_LOCAL_SIGNER') === '1');
     if (!localFallbackEnabled) {
       throw new Error(
         'Circle DCW is not configured. Set CIRCLE_API_KEY, ENTITY_SECRET, and CIRCLE_WALLET_SET_ID; local signers are disabled unless PERIBOLOS_ENABLE_LOCAL_SIGNER=1 is explicitly set.'

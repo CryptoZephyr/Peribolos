@@ -146,10 +146,14 @@ export interface DbSchema {
 }
 
 export const DB_FILE = process.env.PERIBOLOS_DB_FILE || path.join(process.cwd(), 'data', 'db.json');
-const DEMO_RAW_KEY = 'pb_live_demo1234567890abcdef1234567890abcdef';
 
 function shouldSeedDemoData(): boolean {
-  return process.env.NODE_ENV !== 'production' && process.env.PERIBOLOS_SEED_DEMO !== '0';
+  return process.env.NODE_ENV === 'test'
+    || (process.env.NODE_ENV === 'development' && process.env.PERIBOLOS_SEED_DEMO === '1');
+}
+
+function testApiKey(): string | undefined {
+  return process.env.NODE_ENV === 'test' ? process.env.PERIBOLOS_TEST_API_KEY?.trim() : undefined;
 }
 
 class DatabaseStore {
@@ -158,14 +162,14 @@ class DatabaseStore {
   constructor() {
     this.data = this.load();
     this.normalizeApiKeyRoles();
-    if (this.data.workspaces.length === 0) {
+    if (this.data.workspaces.length === 0 && shouldSeedDemoData()) {
       this.seedDefaults();
     }
     this.normalizeVaults();
     if (shouldSeedDemoData()) {
       this.ensureDemoData();
     } else {
-      this.revokeDemoApiKeys();
+      this.purgeDemoData();
     }
     this.ensureBootstrapApiKey();
   }
@@ -174,9 +178,7 @@ class DatabaseStore {
     let changed = false;
     for (const key of this.data.apiKeys) {
       if (!key.role) {
-        key.role = key.id === 'key_demo' || key.name.toLowerCase().includes('bootstrap')
-          ? 'operator'
-          : 'agent';
+        key.role = key.name.toLowerCase().includes('bootstrap') ? 'operator' : 'agent';
         changed = true;
       }
     }
@@ -200,16 +202,15 @@ class DatabaseStore {
     const wsId = 'ws_default';
     const agentId = 'ag_demo';
     const vaultId = 'v_demo';
-    const demoKeyHash = crypto.createHash('sha256').update(DEMO_RAW_KEY).digest('hex');
-
-    if (!this.getApiKeyByHash(demoKeyHash)) {
+    const rawTestKey = testApiKey();
+    if (rawTestKey && !this.getApiKeyByHash(crypto.createHash('sha256').update(rawTestKey).digest('hex'))) {
       this.data.apiKeys.push({
-        id: 'key_demo',
+        id: 'key_test',
         workspaceId: wsId,
         agentId: agentId,
-        keyPrefix: 'pb_live_demo',
-        keyHash: demoKeyHash,
-        name: 'Demo Agent API Key',
+        keyPrefix: rawTestKey.substring(0, 12),
+        keyHash: crypto.createHash('sha256').update(rawTestKey).digest('hex'),
+        name: 'Test Operator API Key',
         role: 'operator',
         status: 'active',
         createdAt: new Date().toISOString()
@@ -393,17 +394,17 @@ class DatabaseStore {
       }
     );
 
-    if (shouldSeedDemoData()) {
-      const demoKeyHash = crypto.createHash('sha256').update(DEMO_RAW_KEY).digest('hex');
+    const rawTestKey = testApiKey();
+    if (rawTestKey) {
       this.data.apiKeys.push({
-        id: 'key_demo',
+        id: 'key_test',
         workspaceId: wsId,
         agentId: agentId,
-        keyPrefix: 'pb_live_demo',
-      keyHash: demoKeyHash,
-      name: 'Demo Agent API Key',
-      role: 'operator',
-      status: 'active',
+        keyPrefix: rawTestKey.substring(0, 12),
+        keyHash: crypto.createHash('sha256').update(rawTestKey).digest('hex'),
+        name: 'Test Operator API Key',
+        role: 'operator',
+        status: 'active',
         createdAt: new Date().toISOString()
       });
     }
@@ -411,13 +412,33 @@ class DatabaseStore {
     this.save();
   }
 
-  private revokeDemoApiKeys(): void {
+  private purgeDemoData(): void {
     let dirty = false;
-    for (const key of this.data.apiKeys) {
-      if (key.id === 'key_demo' || key.keyPrefix === 'pb_live_demo') {
-        key.status = 'revoked';
-        dirty = true;
-      }
+    const beforeKeys = this.data.apiKeys.length;
+    this.data.apiKeys = this.data.apiKeys.filter(key =>
+      key.id !== 'key_demo' && key.id !== 'key_test' && key.keyPrefix !== 'pb_live_demo'
+    );
+    dirty ||= beforeKeys !== this.data.apiKeys.length;
+    const beforeAgents = this.data.agents.length;
+    this.data.agents = this.data.agents.filter(agent => agent.id !== 'ag_demo');
+    dirty ||= beforeAgents !== this.data.agents.length;
+    const beforeVaults = this.data.vaults.length;
+    this.data.vaults = this.data.vaults.filter(vault => vault.id !== 'v_demo');
+    dirty ||= beforeVaults !== this.data.vaults.length;
+    const beforePayees = this.data.payees.length;
+    this.data.payees = this.data.payees.filter(payee => !['pay_x402_seller', 'pay_compute_node'].includes(payee.id));
+    dirty ||= beforePayees !== this.data.payees.length;
+    const beforeUsers = this.data.users.length;
+    this.data.users = this.data.users.filter(user => user.id !== 'u_admin' && user.email !== 'admin@peribolos.io');
+    dirty ||= beforeUsers !== this.data.users.length;
+    const defaultWorkspace = this.data.workspaces.find(workspace => workspace.id === 'ws_default');
+    if (defaultWorkspace && !this.data.users.some(user => user.workspaceId === defaultWorkspace.id)
+      && !this.data.agents.some(agent => agent.workspaceId === defaultWorkspace.id)
+      && !this.data.vaults.some(vault => vault.workspaceId === defaultWorkspace.id)
+      && !this.data.payees.some(payee => payee.workspaceId === defaultWorkspace.id)
+      && !this.data.apiKeys.some(key => key.workspaceId === defaultWorkspace.id)) {
+      this.data.workspaces = this.data.workspaces.filter(workspace => workspace.id !== defaultWorkspace.id);
+      dirty = true;
     }
     if (dirty) this.save();
   }
@@ -430,6 +451,15 @@ class DatabaseStore {
     const agentId = process.env.PERIBOLOS_BOOTSTRAP_AGENT_ID || 'ag_bootstrap';
     const keyHash = crypto.createHash('sha256').update(rawKey).digest('hex');
     if (this.getApiKeyByHash(keyHash)) return;
+
+    if (!this.data.workspaces.find(workspace => workspace.id === workspaceId)) {
+      this.data.workspaces.push({
+        id: workspaceId,
+        name: 'Bootstrap Workspace',
+        slug: workspaceId.replace(/^ws_/, '').toLowerCase(),
+        createdAt: new Date().toISOString()
+      });
+    }
 
     if (!this.data.agents.find(a => a.id === agentId)) {
       this.data.agents.push({

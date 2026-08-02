@@ -1,6 +1,3 @@
-process.env.NODE_ENV = 'test';
-process.env.PERIBOLOS_DISABLE_INDEXER = '1';
-
 import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert';
 import crypto from 'node:crypto';
@@ -18,7 +15,7 @@ describe('Peribolos V2 API Integration Tests', () => {
   const PORT = 3405;
   let testServer: ReturnType<typeof app.listen>;
   const baseUrl = `http://localhost:${PORT}`;
-  const DEMO_KEY = 'pb_live_demo1234567890abcdef1234567890abcdef';
+  const DEMO_KEY = process.env.PERIBOLOS_TEST_API_KEY;
   const ALLOWED_PAYEE = '0x70997970C51812dc3A010C7d01b50e0d17dc79C8';
   const BLOCKED_PAYEE = '0x1111111111111111111111111111111111111111';
 
