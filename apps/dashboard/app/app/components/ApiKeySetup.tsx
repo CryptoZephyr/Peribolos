@@ -8,6 +8,7 @@ export function ApiKeySetup() {
   const [open, setOpen] = useState(false);
   const [value, setValue] = useState("");
   const [configured, setConfigured] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const sync = () => {
@@ -21,10 +22,14 @@ export function ApiKeySetup() {
 
   function save() {
     const trimmed = value.trim();
-    if (!trimmed.startsWith("pb_live_") || trimmed.length < 20) return;
+    if (!trimmed.startsWith("pb_live_") || trimmed.length < 20) {
+      setError("Use the full pb_live_ key copied when the agent was provisioned.");
+      return;
+    }
     window.localStorage.setItem(STORAGE_KEY, trimmed);
     window.dispatchEvent(new Event("peribolos-api-key-changed"));
     setValue("");
+    setError(null);
     setOpen(false);
     window.location.reload();
   }
@@ -33,13 +38,14 @@ export function ApiKeySetup() {
     window.localStorage.removeItem(STORAGE_KEY);
     window.dispatchEvent(new Event("peribolos-api-key-changed"));
     setOpen(false);
+    window.location.reload();
   }
 
   return (
     <>
       <button
         type="button"
-        onClick={() => setOpen(true)}
+        onClick={() => { setError(null); setOpen(true); }}
         className={`rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors ${
               configured
             ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20"
@@ -54,7 +60,7 @@ export function ApiKeySetup() {
           <div className="my-auto max-h-[calc(100dvh-2rem)] w-full max-w-md overflow-y-auto rounded-xl border border-line bg-surface-raised p-5 shadow-2xl sm:max-h-[calc(100dvh-3rem)] sm:p-6">
             <h2 className="text-base font-semibold text-text">Connect management API</h2>
             <p className="mt-2 text-xs leading-relaxed text-text-muted">
-              Paste the <code>pb_live_...</code> key shown once when you provision an agent. It stays in this browser only.
+              Paste the <code>pb_live_...</code> key shown once when you provision an agent. It stays in this browser only and tells Peribolos which workspace to load.
             </p>
             <input
               type="password"
@@ -64,6 +70,7 @@ export function ApiKeySetup() {
               autoFocus
               className="mt-4 w-full rounded-md border border-line bg-surface px-3 py-2 text-xs font-mono text-text outline-none focus:border-accent"
             />
+            {error && <p role="alert" className="mt-2 text-[11px] leading-relaxed text-rose-300">{error}</p>}
             <div className="mt-5 flex items-center justify-between gap-3">
               <button type="button" onClick={clear} className="text-xs text-text-muted hover:text-text">
                 Clear saved key

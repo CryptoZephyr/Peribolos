@@ -28,17 +28,34 @@ export default function DashboardOverviewPage() {
 
   const [paymentRequests, setPaymentRequests] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [loadWarning, setLoadWarning] = useState<string | null>(null);
 
   useEffect(() => {
     async function loadData() {
+      setLoadError(null);
+      setLoadWarning(null);
       try {
-        const [activity, agents, payees, keys, vaults]: [any, any, any, any, any] = await Promise.all([
-          fetchApi('/v1/activity').catch(() => ({ paymentRequests: [] })),
-          fetchApi('/v1/agents').catch(() => []),
-          fetchApi('/v1/payees').catch(() => []),
-          fetchApi('/v1/api-keys').catch(() => []),
-          fetchApi('/v1/vaults').catch(() => []),
+        const results = await Promise.allSettled([
+          fetchApi<any>('/v1/activity'),
+          fetchApi<any>('/v1/agents'),
+          fetchApi<any>('/v1/payees'),
+          fetchApi<any>('/v1/api-keys'),
+          fetchApi<any>('/v1/vaults'),
         ]);
+        const [activityResult, agentsResult, payeesResult, keysResult, vaultsResult] = results;
+        const failed = results.filter((result) => result.status === 'rejected').length;
+        if (failed === results.length) {
+          setLoadError('We could not reach this workspace. Your data has not been deleted; check the API key or connection and try again.');
+        } else if (failed > 0) {
+          setLoadWarning(`${failed} workspace data source${failed === 1 ? '' : 's'} did not respond. Some counts may be incomplete.`);
+        }
+
+        const activity = activityResult.status === 'fulfilled' ? activityResult.value : { paymentRequests: [] };
+        const agents = agentsResult.status === 'fulfilled' ? agentsResult.value : [];
+        const payees = payeesResult.status === 'fulfilled' ? payeesResult.value : [];
+        const keys = keysResult.status === 'fulfilled' ? keysResult.value : [];
+        const vaults = vaultsResult.status === 'fulfilled' ? vaultsResult.value : [];
 
         const prs = activity?.paymentRequests || [];
         setPaymentRequests(prs);
@@ -110,6 +127,19 @@ export default function DashboardOverviewPage() {
         </div>
       </div>
 
+      {loadError && (
+        <div role="alert" className="flex flex-col gap-3 rounded-xl border border-rose-500/25 bg-rose-500/5 px-4 py-4 text-sm text-text sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="font-semibold text-rose-300">Workspace data is unavailable</p>
+            <p className="mt-1 text-xs leading-5 text-text-muted">{loadError}</p>
+          </div>
+          <Link href="/app/api-keys" className="shrink-0 rounded-lg border border-line bg-surface px-3 py-2 text-xs font-semibold text-text hover:border-line-strong">Check API access</Link>
+        </div>
+      )}
+      {!loadError && loadWarning && (
+        <div role="status" className="rounded-xl border border-amber-500/25 bg-amber-500/5 px-4 py-3 text-xs text-amber-200">{loadWarning}</div>
+      )}
+
       {loading ? (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
           <SkeletonCard />
@@ -168,8 +198,10 @@ export default function DashboardOverviewPage() {
         {loading ? (
           <SkeletonTableRows rows={4} />
         ) : paymentRequests.length === 0 ? (
-          <div className="rounded-lg border border-dashed border-line bg-surface px-5 py-12 text-center text-xs leading-5 text-text-muted">
-            No payment decisions yet. Run a security simulation or trigger a policy-bound payment to create the first audit entry.
+          <div className="rounded-lg border border-dashed border-line bg-surface px-5 py-12 text-center">
+            <p className="text-sm font-semibold text-text">No payment decisions yet</p>
+            <p className="mx-auto mt-2 max-w-md text-xs leading-5 text-text-muted">Run a security simulation or send a policy-bound payment. The resulting decision will appear here and remain in your audit history.</p>
+            <Link href="/app/simulations" className="mt-4 inline-flex rounded-lg bg-text px-3 py-2 text-xs font-semibold text-white hover:bg-accent">Run a security audit</Link>
           </div>
         ) : (
           <div className="divide-y divide-line">

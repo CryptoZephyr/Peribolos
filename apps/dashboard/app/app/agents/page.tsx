@@ -52,6 +52,7 @@ export default function AgentsPage() {
   const [newAgentName, setNewAgentName] = useState("");
   const [newAgentFramework, setNewAgentFramework] = useState("langchain");
   const [createdApiKey, setCreatedApiKey] = useState<string | null>(null);
+  const [keySaved, setKeySaved] = useState(false);
 
   const [confirmModal, setConfirmModal] = useState<{
     isOpen: boolean;
@@ -110,7 +111,8 @@ export default function AgentsPage() {
 
       if (res.apiKey) {
         setCreatedApiKey(res.apiKey);
-        toast.success("Agent Provisioned!", "New agent, vault & API key generated.");
+        setKeySaved(false);
+        toast.success("Agent provisioned", "The managed signer and payment key are ready.");
       }
       setShowCreateModal(false);
       setNewAgentName("");
@@ -287,7 +289,7 @@ export default function AgentsPage() {
             </button>
           </div>
           <p className="text-xs text-text">
-            Copy your Agent API Key now (`pb_live_...`). It will not be displayed again:
+            Copy this Agent API Key now (`pb_live_...`). It will not be displayed again. You can also use it in this browser so the dashboard loads this workspace consistently:
           </p>
           <div className="flex items-center gap-2">
             <input
@@ -297,6 +299,22 @@ export default function AgentsPage() {
               className="flex-1 rounded-md border border-emerald-500/40 bg-surface px-3 py-2 text-xs font-mono text-emerald-300 select-all"
             />
             <CopyButton text={createdApiKey} label="Copy API Key" />
+          </div>
+          <div className="flex flex-wrap items-center gap-3 pt-1">
+            <button
+              type="button"
+              onClick={() => {
+                window.localStorage.setItem("peribolos.apiKey.v1", createdApiKey);
+                window.dispatchEvent(new Event("peribolos-api-key-changed"));
+                setKeySaved(true);
+                toast.success("Workspace connected", "This browser will now load this agent workspace.");
+              }}
+              disabled={keySaved}
+              className="rounded-lg bg-text px-3 py-2 text-[11px] font-semibold text-white hover:bg-accent disabled:cursor-default disabled:bg-emerald-700"
+            >
+              {keySaved ? "Using this key in browser" : "Use this key in this browser"}
+            </button>
+            <span className="text-[11px] text-text-muted">Stored locally; never sent to Peribolos analytics.</span>
           </div>
         </div>
       )}

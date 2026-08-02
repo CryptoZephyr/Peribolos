@@ -10,18 +10,20 @@ import { DownloadSimple, MagnifyingGlass } from "@phosphor-icons/react";
 export default function ActivityPage() {
   const [paymentRequests, setPaymentRequests] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<"ALL" | "EXECUTED" | "BLOCKED">("ALL");
   const [query, setQuery] = useState("");
 
   const toast = useToast();
 
   useEffect(() => {
+    setError(null);
     fetchApi("/v1/activity")
       .then((data: any) => {
         setPaymentRequests(data.paymentRequests || []);
       })
       .catch((err) => {
-        console.warn("Failed to load activity:", err);
+        setError(err instanceof Error ? err.message : "Unable to load activity right now.");
       })
       .finally(() => setLoading(false));
   }, []);
@@ -118,9 +120,16 @@ export default function ActivityPage() {
         <div className="app-panel p-6">
           <SkeletonTableRows rows={5} />
         </div>
+      ) : error ? (
+        <div role="alert" className="rounded-xl border border-rose-500/25 bg-rose-500/5 px-5 py-12 text-center">
+          <p className="text-sm font-semibold text-rose-300">Activity could not be loaded</p>
+          <p className="mx-auto mt-2 max-w-md text-xs leading-5 text-text-muted">{error}. Your audit records remain on the server; reconnect the workspace and try again.</p>
+          <button type="button" onClick={() => window.location.reload()} className="mt-4 rounded-lg bg-text px-3 py-2 text-xs font-semibold text-white hover:bg-accent">Try again</button>
+        </div>
       ) : filteredRequests.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-line bg-surface-raised py-16 text-center text-xs text-text-muted">
-          No records matching selected filter.
+        <div className="rounded-xl border border-dashed border-line bg-surface-raised py-16 text-center">
+          <p className="text-sm font-semibold text-text">{paymentRequests.length === 0 ? "No activity yet" : "No matching records"}</p>
+          <p className="mx-auto mt-2 max-w-md text-xs leading-5 text-text-muted">{paymentRequests.length === 0 ? "Executed payments and blocked attempts will stay here as your audit history." : "Try a different filter or clear the search to see the rest of the audit history."}</p>
         </div>
       ) : (
         <div className="overflow-x-auto rounded-xl border border-line bg-surface-raised shadow-[0_10px_28px_rgba(16,24,40,0.04)]">

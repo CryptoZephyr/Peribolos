@@ -42,7 +42,10 @@ type ChainState = {
 export default function VaultsPage() {
   const [vaults, setVaults] = useState<Vault[]>([]);
   const [chainStates, setChainStates] = useState<Record<string, ChainState>>({});
+  const [chainErrors, setChainErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [dailyCap, setDailyCap] = useState("100");
   const [perTxCap, setPerTxCap] = useState("25");
@@ -63,6 +66,7 @@ export default function VaultsPage() {
   }, []);
 
   async function loadVaults() {
+    setLoadError(null);
     try {
       const data: Vault[] = await fetchApi("/v1/vaults");
       setVaults(data);
@@ -70,21 +74,25 @@ export default function VaultsPage() {
         data.filter((vault) => vault.mode === "live").map(async (vault) => {
           try {
             const state = await fetchApi<ChainState>(`/v1/vaults/${vault.id}/chain-state`);
-            return [vault.id, state] as const;
-          } catch {
-            return null;
+            return { id: vault.id, state };
+          } catch (error) {
+            return { id: vault.id, error: error instanceof Error ? error.message : "Arc state unavailable" };
           }
         }),
       );
-      setChainStates((current) => {
-        const next = { ...current };
-        for (const entry of liveStates) if (entry) next[entry[0]] = entry[1];
-        return next;
-      });
+      const nextStates: Record<string, ChainState> = {};
+      const nextErrors: Record<string, string> = {};
+      for (const entry of liveStates) {
+        if (entry.state) nextStates[entry.id] = entry.state;
+        else if (entry.error) nextErrors[entry.id] = entry.error;
+      }
+      setChainStates(nextStates);
+      setChainErrors(nextErrors);
       if (data.length > 0 && !linkVaultId) {
         setLinkVaultId(data[0].id);
       }
     } catch (err) {
+      setLoadError(err instanceof Error ? err.message : "Unable to load vaults right now.");
       console.warn("Failed to fetch vaults:", err);
     } finally {
       setLoading(false);
@@ -116,6 +124,7 @@ export default function VaultsPage() {
         body: JSON.stringify(body),
       });
       toast.success("Spending Rules Updated", "Vault daily & per-tx limits saved.");
+      setSuccessMessage("Spending rules saved. The workspace now reflects the updated policy.");
       setEditingId(null);
       await loadVaults();
     } catch (err: unknown) {
@@ -126,15 +135,17 @@ export default function VaultsPage() {
   }
 
   async function togglePause(vault: Vault) {
+    const currentPaused = chainStates[vault.id]?.paused ?? vault.paused;
     try {
       await fetchApi("/v1/signers/pause", {
         method: "POST",
-        body: JSON.stringify({ vaultId: vault.id, paused: !vault.paused }),
+        body: JSON.stringify({ vaultId: vault.id, paused: !currentPaused }),
       });
       toast.info(
-        `Vault ${vault.paused ? "Unpaused" : "Paused"}`,
+        `Vault ${currentPaused ? "Unpaused" : "Paused"}`,
         `Vault ${vault.id} status updated.`
       );
+      setSuccessMessage(`Vault ${currentPaused ? "resumed" : "paused"}. Refreshing the authoritative Arc state now.`);
       await loadVaults();
     } catch (err: unknown) {
       toast.error("Pause Failed", err instanceof Error ? err.message : String(err));
@@ -171,6 +182,7 @@ export default function VaultsPage() {
         }),
       });
       toast.success("Domain Linked as Live Vault", `Arc Vault Address: ${vaultAddress}`);
+      setSuccessMessage("Vault linked. Balance, pause state, and audit history now use this live contract.");
       setShowCreateDomain(false);
       await loadVaults();
     } catch (err: unknown) {
@@ -236,10 +248,23 @@ export default function VaultsPage() {
         </div>
       )}
 
+      {successMessage && (
+        <div role="status" className="flex items-start justify-between gap-3 rounded-xl border border-emerald-500/25 bg-emerald-500/5 px-4 py-3 text-xs text-emerald-200">
+          <span>{successMessage}</span>
+          <button type="button" onClick={() => setSuccessMessage(null)} className="text-emerald-300/70 hover:text-emerald-200" aria-label="Dismiss success message">×</button>
+        </div>
+      )}
+
       {loading ? (
         <div className="grid grid-cols-1 gap-6">
           <SkeletonCard />
           <SkeletonCard />
+        </div>
+      ) : loadError ? (
+        <div role="alert" className="rounded-xl border border-rose-500/25 bg-rose-500/5 p-12 text-center">
+          <p className="text-sm font-semibold text-rose-300">Vaults could not be loaded</p>
+          <p className="mx-auto mt-2 max-w-md text-xs leading-5 text-text-muted">{loadError}. Nothing was removed; reconnect the workspace and try again.</p>
+          <button type="button" onClick={() => void loadVaults()} className="mt-4 rounded-lg bg-text px-3 py-2 text-xs font-semibold text-white hover:bg-accent">Try again</button>
         </div>
       ) : vaults.length === 0 ? (
         <div className="rounded-xl border border-dashed border-line bg-surface-raised p-12 text-center text-xs text-text-muted space-y-3">
@@ -253,6 +278,7 @@ export default function VaultsPage() {
           {vaults.map((vault) => (
             (() => {
               const chainState = chainStates[vault.id];
+              const paused = chainState?.paused ?? vault.paused;
               return (
             <div
               key={vault.id}
@@ -271,7 +297,7 @@ export default function VaultsPage() {
                     >
                       {vault.mode || "offline"}
                     </span>
-                    {vault.paused && (
+                    {paused && (
                       <span className="rounded bg-rose-500/15 text-rose-400 border border-rose-500/30 px-2 py-0.5 text-[10px] font-bold uppercase">
                         Paused
                       </span>
@@ -297,7 +323,7 @@ export default function VaultsPage() {
                       vault.paused ? "bg-emerald-600 hover:bg-emerald-500" : "bg-rose-600 hover:bg-rose-500"
                     }`}
                   >
-                    {vault.paused ? "Unpause Vault" : "Pause Vault"}
+                    {paused ? "Unpause Vault" : "Pause Vault"}
                   </button>
                   <button
                     onClick={() => startEdit(vault)}
@@ -327,9 +353,12 @@ export default function VaultsPage() {
                   <div className="rounded-lg border border-emerald-500/25 bg-emerald-500/5 p-4">
                     <span className="text-xs text-text-muted">Authoritative Arc Balance</span>
                     <p className="mt-1 text-lg font-bold text-emerald-300 font-mono">
-                      {chainState ? `${chainState.balanceUsdc} USDC` : "Reading Arc…"}
+                      {chainState ? `${chainState.balanceUsdc} USDC` : chainErrors[vault.id] ? "Arc state unavailable" : "Reading Arc…"}
                     </p>
                     <span className="text-[10px] text-text-faint">On-chain ERC-20 balance</span>
+                    {chainErrors[vault.id] && (
+                      <button type="button" onClick={() => void loadVaults()} className="mt-2 text-[10px] font-semibold text-accent hover:underline">Retry Arc sync</button>
+                    )}
                   </div>
                 )}
               </div>
@@ -418,7 +447,7 @@ export default function VaultsPage() {
                 <OwnerControls
                   vaultAddress={vault.address as Address}
                   owner={vault.ownerAddress as Address}
-                  paused={vault.paused}
+                  paused={paused}
                   balance={chainState ? BigInt(chainState.balanceUsdcUnits) : 0n}
                   onSettled={loadVaults}
                 />
