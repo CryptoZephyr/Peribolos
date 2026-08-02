@@ -142,7 +142,9 @@ export class ManagedSignerService {
       }
     }
     if (process.env.NODE_ENV === 'production' && (!this.circleClient || !this.circleWalletSetId)) {
-      throw new Error('Production requires CIRCLE_API_KEY, ENTITY_SECRET, and CIRCLE_WALLET_SET_ID; refusing to use the legacy local signer.');
+      console.error(
+        '[Signer] Circle DCW is not configured; signer provisioning and live payments are disabled until CIRCLE_API_KEY, ENTITY_SECRET, and CIRCLE_WALLET_SET_ID are set.'
+      );
     }
   }
 
