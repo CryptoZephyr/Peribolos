@@ -77,7 +77,7 @@ export function SupabaseAuthProvider({ children }: { children: ReactNode }) {
     signInWithWeb3: async () => {
       if (!supabase) throw new Error("Supabase Auth is not configured for this dashboard.");
       if (typeof window === "undefined" || !("ethereum" in window)) {
-        throw new Error("No Ethereum wallet detected. Open Peribolos in a browser with MetaMask, Rabby, or another injected wallet.");
+        throw new Error("No Ethereum wallet detected. Open Peribolos in a browser with an injected wallet.");
       }
       const { error } = await supabase.auth.signInWithWeb3({
         chain: "ethereum",

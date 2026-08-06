@@ -34,9 +34,10 @@ export function HowItWorks() {
               Bounded by deposit
             </h3>
             <p className="mt-4 leading-relaxed text-text-muted">
-              For paid APIs behind x402, the agent spends from a small Circle
-              Gateway nanopayment deposit. There&rsquo;s no rule engine to
-              check: the deposit itself is the ceiling.
+              The SDK and demo-agent can pair paid APIs behind x402 with a
+              small Circle Gateway nanopayment deposit. The deposit is the
+              ceiling; this dashboard intentionally manages the separate vault
+              tier and does not display Gateway balances.
             </p>
           </Reveal>
         </div>

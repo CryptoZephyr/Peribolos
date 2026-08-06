@@ -8,7 +8,7 @@ export const metadata: Metadata = {
     template: "%s | Peribolos",
   },
   description:
-    "Rule-enforced USDC smart vaults for autonomous AI agents. Non-custodial budget caps, recipient allowlists, and contract-enforced protection on Arc Testnet.",
+    "Rule-enforced USDC smart vaults for autonomous AI agents. Budget caps, recipient allowlists, and contract-enforced protection on Arc Testnet.",
   keywords: [
     "AI Agent Security",
     "Smart Contract Vault",
@@ -16,7 +16,7 @@ export const metadata: Metadata = {
     "Circle DCW",
     "USDC Payments",
     "Prompt Injection Protection",
-    "Non-custodial Wallet Policy",
+    "Managed Agent Wallet Policy",
   ],
   authors: [{ name: "Peribolos Security Team" }],
   openGraph: {

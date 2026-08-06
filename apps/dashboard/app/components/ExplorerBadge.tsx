@@ -1,6 +1,7 @@
 "use client";
 
 import { memo, useState } from "react";
+import { addressUrl, txUrl } from "@/lib/chain";
 
 export const ExplorerBadge = memo(function ExplorerBadge({
   type,
@@ -11,7 +12,7 @@ export const ExplorerBadge = memo(function ExplorerBadge({
   hashOrAddress: string;
   label?: string;
 }) {
-  const url = `https://testnet.arcscan.app/${type}/${hashOrAddress}`;
+  const url = type === "tx" ? txUrl(hashOrAddress) : addressUrl(hashOrAddress);
   const truncated =
     hashOrAddress.length > 16
       ? `${hashOrAddress.substring(0, 6)}...${hashOrAddress.substring(hashOrAddress.length - 4)}`
@@ -32,15 +33,16 @@ export const ExplorerBadge = memo(function ExplorerBadge({
 });
 
 export function CopyButton({ text, label = "Copy" }: { text: string; label?: string }) {
-  const [copied, setCopied] = useState(false);
+  const [copyState, setCopyState] = useState<"idle" | "copied" | "failed">("idle");
 
   const handleCopy = async () => {
     try {
       await navigator.clipboard.writeText(text);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      setCopyState("copied");
+      setTimeout(() => setCopyState("idle"), 2000);
     } catch {
-      // Ignore clipboard fallback
+      setCopyState("failed");
+      setTimeout(() => setCopyState("idle"), 2500);
     }
   };
 
@@ -48,9 +50,9 @@ export function CopyButton({ text, label = "Copy" }: { text: string; label?: str
     <button
       onClick={handleCopy}
       className="inline-flex items-center gap-1 rounded border border-line bg-surface px-2 py-0.5 text-[11px] font-medium text-text-muted hover:text-text hover:bg-surface-raised transition-colors"
-      title="Copy to clipboard"
+      title={copyState === "failed" ? "Clipboard access failed. Copy the value manually." : "Copy to clipboard"}
     >
-      <span>{copied ? "Copied!" : label}</span>
+      <span>{copyState === "copied" ? "Copied" : copyState === "failed" ? "Copy failed" : label}</span>
     </button>
   );
 }

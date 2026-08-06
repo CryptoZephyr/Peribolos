@@ -1,7 +1,6 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import { FACTORY_ADDRESS, addressUrl, txUrl } from "@/lib/chain";
-import { BLOCKED_TX_HASH } from "../components/landing/Problem";
+import { FACTORY_ADDRESS, addressUrl } from "@/lib/chain";
 
 export const metadata: Metadata = {
   title: "Education Center · Peribolos",
@@ -26,7 +25,7 @@ export default function EducationPage() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-[68ch] px-6 py-20 sm:py-28">
+      <main id="main-content" className="mx-auto max-w-[68ch] px-6 py-20 sm:py-28">
         <p className="text-sm font-medium uppercase tracking-wide text-text-faint">
           Education Center
         </p>
@@ -126,12 +125,11 @@ export default function EducationPage() {
             <p>
               Not every payment needs the same weight of enforcement. The
               vault tier handles meaningful transfers under explicit,
-              owner-set rules. A lighter petty-cash tier handles paid API
-              calls behind the x402 protocol, spending from a small Circle
-              Gateway nanopayment deposit. There is no rule engine to defeat
-              there either: the deposit itself is the ceiling, so the
-              worst case is bounded by how much was funded, not by what an
-              attacker can talk the model into.
+              owner-set rules. The SDK and demo-agent also support a lighter
+              petty-cash path for paid API calls behind x402, spending from a
+              small Circle Gateway nanopayment deposit. That separate path is
+              not managed or displayed in this dashboard; the deposit itself
+              is the ceiling.
             </p>
           </div>
         </section>
@@ -142,10 +140,10 @@ export default function EducationPage() {
           </h2>
           <div className="mt-4 space-y-4 leading-relaxed text-text-muted">
             <p>
-              Every Peribolos vault mints its agent an ERC-8004 identity NFT
-              on-chain at creation. That gives each spending domain a
-              verifiable identity tied to the chain itself, rather than a
-              name an agent simply reports about itself in conversation.
+              Peribolos requests an ERC-8004 identity registration when a vault
+              is created. The registry call is best-effort and does not block
+              domain creation, so a live identity record must be verified before
+              treating it as evidence.
             </p>
           </div>
         </section>
@@ -154,15 +152,15 @@ export default function EducationPage() {
           <h2 className="text-xl font-medium text-text">The record</h2>
           <div className="mt-4 space-y-4 leading-relaxed text-text-muted">
             <p>
-              This is not a hypothetical. On Arc testnet, an injected drain
-              attempt against a live Peribolos vault was blocked and
-              recorded, moving nothing:
+              A blocked payment is recorded with its policy reason and moves
+              nothing. Use the Activity screen and the linked explorer proof
+              when a live vault produces a transaction.
             </p>
           </div>
           <div className="mt-4 rounded-[12px] border border-line bg-surface-raised p-6">
             <div className="flex items-center justify-between gap-4">
               <span className="text-xs font-medium text-text-faint">
-                On-chain evidence
+                Example policy outcome
               </span>
               <span className="rounded-full border border-blocked/30 bg-blocked-tint px-2.5 py-1 text-xs font-medium text-blocked">
                 PaymentBlocked
@@ -173,17 +171,6 @@ export default function EducationPage() {
               <dd className="text-text">RECIPIENT_NOT_ALLOWLISTED</dd>
               <dt className="text-text-faint">moved</dt>
               <dd className="text-text">0.00 USDC</dd>
-              <dt className="text-text-faint">tx</dt>
-              <dd>
-                <a
-                  href={txUrl(BLOCKED_TX_HASH)}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="break-all text-accent underline underline-offset-2 transition-colors hover:text-text"
-                >
-                  {BLOCKED_TX_HASH}
-                </a>
-              </dd>
             </dl>
           </div>
         </section>

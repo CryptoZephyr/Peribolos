@@ -807,6 +807,18 @@ v1Router.post('/api-keys', authenticateApiKey, requireOperator, (req: Request, r
   });
 });
 
+function revokeApiKey(req: Request, res: Response) {
+  const workspaceId = (req as any).workspaceId as string;
+  const key = db.revokeApiKey(workspaceId, req.params.id);
+  if (!key) {
+    return res.status(404).json({ error: 'NOT_FOUND', message: 'API key not found in this workspace.' });
+  }
+  return res.json({ id: key.id, status: key.status, message: 'API key revoked. Future requests using it are rejected.' });
+}
+
+v1Router.post('/api-keys/:id/revoke', authenticateApiKey, requireOperator, revokeApiKey);
+v1Router.delete('/api-keys/:id', authenticateApiKey, requireOperator, revokeApiKey);
+
 v1Router.post('/signers/rotate', authenticateApiKey, requireOperator, async (req: Request, res: Response) => {
   const { vaultId, agentId } = req.body;
   if (!vaultId || !agentId) {

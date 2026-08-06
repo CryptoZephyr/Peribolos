@@ -48,7 +48,13 @@ export function Hero() {
 
         <figure className="relative flex min-h-[420px] items-center justify-center overflow-hidden rounded-[28px] border border-line bg-[#f0faf5] shadow-[0_20px_60px_rgba(4,120,87,0.11)] sm:min-h-[540px]">
           <div aria-hidden className="absolute inset-0 opacity-80" style={{ backgroundImage: "radial-gradient(rgba(4,120,87,0.16) 1px, transparent 1px)", backgroundSize: "22px 22px", maskImage: "radial-gradient(ellipse at center, black, transparent 72%)" }} />
-          <Image src={PeribolosArtwork} alt="Peribolos brand mark" priority sizes="(min-width: 1024px) 52vw, 100vw" className="relative z-10 h-auto w-[78%] max-w-[500px] mix-blend-multiply" />
+          <Image
+            src={PeribolosArtwork}
+            alt="Peribolos logo"
+            priority
+            sizes="(min-width: 1024px) 52vw, 100vw"
+            className="relative z-10 h-auto w-[78%] max-w-[500px] mix-blend-multiply"
+          />
           <div className="absolute bottom-5 left-5 right-5 z-20 rounded-2xl border border-white/70 bg-white/90 p-4 shadow-[0_14px_34px_rgba(16,24,40,0.14)] backdrop-blur sm:bottom-7 sm:left-7 sm:right-7 sm:p-5">
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-2.5">

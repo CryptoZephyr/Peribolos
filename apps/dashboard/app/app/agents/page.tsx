@@ -377,7 +377,9 @@ export default function AgentsPage() {
                   <div className="flex items-center justify-between">
                     <span className="text-text-muted">Vault Contract Mode:</span>
                     <span className="font-mono text-[11px] font-medium text-text">
-                      {vault?.mode === "live" ? (
+                      {!vault ? (
+                        <span className="text-amber-400">○ NO VAULT</span>
+                      ) : vault.mode === "live" ? (
                         <span className="text-emerald-400">● Arc Testnet Live</span>
                       ) : (
                         <span className="text-amber-400">○ Policy simulator (no funds)</span>
@@ -388,19 +390,19 @@ export default function AgentsPage() {
                     <span className="text-text-muted">Vault Status:</span>
                     <span
                       className={`font-semibold text-[11px] ${
-                        vault?.paused ? "text-rose-400" : "text-emerald-400"
+                        !vault ? "text-amber-400" : vault.paused ? "text-rose-400" : "text-emerald-400"
                       }`}
                     >
-                      {vault?.paused ? "PAUSED" : "ACTIVE"}
+                      {!vault ? "NO VAULT" : vault.paused ? "PAUSED" : "ACTIVE"}
                     </span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-text-muted">Daily Budget Cap:</span>
-                    <span className="font-mono font-semibold text-text">${vault?.dailyCapUsdc || 100} USDC</span>
+                    {vault ? <span className="font-mono font-semibold text-text">${vault.dailyCapUsdc ?? 0} USDC</span> : <span className="font-mono font-semibold text-amber-400">Not configured</span>}
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-text-muted">Per-Tx Cap:</span>
-                    <span className="font-mono font-semibold text-text">${vault?.perTxCapUsdc || 25} USDC</span>
+                    {vault ? <span className="font-mono font-semibold text-text">${vault.perTxCapUsdc ?? 0} USDC</span> : <span className="font-mono font-semibold text-amber-400">Not configured</span>}
                   </div>
                 </div>
 
@@ -409,9 +411,13 @@ export default function AgentsPage() {
                     onClick={() =>
                       vault && promptRotateSigner(vault.id, agent.id, agent.name, vault.mode, vault.address)
                     }
-                    className="flex-1 rounded-md border border-line bg-surface px-3 py-2 text-xs font-semibold text-text hover:bg-surface-raised transition-colors"
+                    disabled={!vault}
+                    title={!vault ? "Create or link a vault before rotating a signer." : undefined}
+                    className="flex-1 rounded-md border border-line bg-surface px-3 py-2 text-xs font-semibold text-text hover:bg-surface-raised transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                   >
-                    {vault?.mode === "live"
+                    {!vault
+                      ? "Vault required"
+                      : vault.mode === "live"
                       ? "🔑 Rotate On-Chain Key"
                       : isLegacyLocalSigner
                         ? "♻ Re-provision DCW"
@@ -421,13 +427,15 @@ export default function AgentsPage() {
                     onClick={() =>
                       vault && promptPauseVault(vault.id, vault.paused, agent.name)
                     }
+                    disabled={!vault}
+                    title={!vault ? "Create or link a vault before changing pause state." : undefined}
                     className={`flex-1 rounded-md px-3 py-2 text-xs font-semibold text-white transition-opacity ${
                       vault?.paused
                         ? "bg-emerald-600 hover:bg-emerald-500"
                         : "bg-rose-600 hover:bg-rose-500"
-                    }`}
+                    } disabled:cursor-not-allowed disabled:bg-surface-overlay disabled:text-text-faint disabled:hover:bg-surface-overlay`}
                   >
-                    {vault?.paused ? "▶ Unpause Vault" : "⏸ Pause Vault"}
+                    {vault ? (vault.paused ? "▶ Unpause Vault" : "⏸ Pause Vault") : "Vault required"}
                   </button>
                 </div>
               </div>

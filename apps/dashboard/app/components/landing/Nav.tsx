@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { LandingBrand } from "./LandingBrand";
+import { ARC_DOCS_URL } from "@/lib/chain";
 
 export function Nav() {
   return (
@@ -22,7 +23,7 @@ export function Nav() {
             How it works
           </a>
           <a
-            href="https://docs.arc.network"
+            href={ARC_DOCS_URL}
             target="_blank"
             rel="noreferrer"
             className="hidden text-sm text-text-muted transition-colors hover:text-text sm:inline"

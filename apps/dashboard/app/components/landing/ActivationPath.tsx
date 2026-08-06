@@ -6,7 +6,7 @@ import { Reveal } from "./Reveal";
 
 const STEPS = [
   { number: "01", title: "Sign in", body: "Use email first, then register a passkey for this device." },
-  { number: "02", title: "Connect the owner wallet", body: "Rabby approves the actions that belong to you, including deployment and funding." },
+  { number: "02", title: "Connect the owner wallet", body: "Your injected browser wallet approves the actions that belong to you, including deployment and funding." },
   { number: "03", title: "Create the boundary", body: "Provision an agent, set caps, allow a payee, and deploy a live vault on Arc." },
   { number: "04", title: "Verify one payment", body: "Send a small test request and see the policy decision, transaction, and audit proof." },
 ];

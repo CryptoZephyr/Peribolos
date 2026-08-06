@@ -20,7 +20,18 @@ const ROUTES = [
 export function WorkspaceHeader() {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const [highlightedIndex, setHighlightedIndex] = useState(0);
   const current = useMemo(() => ROUTES.find((route) => route.href === pathname) ?? ROUTES.find((route) => pathname.startsWith(`${route.href}/`)) ?? ROUTES[0], [pathname]);
+  const filteredRoutes = useMemo(() => {
+    const normalizedQuery = query.trim().toLowerCase();
+    if (!normalizedQuery) return ROUTES;
+    return ROUTES.filter((route) => `${route.label} ${route.detail}`.toLowerCase().includes(normalizedQuery));
+  }, [query]);
+
+  useEffect(() => {
+    setHighlightedIndex(0);
+  }, [query, open]);
 
   useEffect(() => {
     function handleShortcut(event: KeyboardEvent) {
@@ -63,12 +74,36 @@ export function WorkspaceHeader() {
           <div className="w-full max-w-[560px] overflow-hidden rounded-xl border border-line-strong bg-surface-raised shadow-[0_24px_80px_rgba(16,24,40,0.22)]">
             <div className="flex items-center gap-3 border-b border-line px-4 py-3">
               <MagnifyingGlass size={17} className="text-text-muted" aria-hidden />
-              <span className="flex-1 text-sm text-text-muted">Jump to a workspace</span>
+              <input
+                autoFocus
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "ArrowDown") {
+                    event.preventDefault();
+                    setHighlightedIndex((index) => filteredRoutes.length ? (index + 1) % filteredRoutes.length : 0);
+                  } else if (event.key === "ArrowUp") {
+                    event.preventDefault();
+                    setHighlightedIndex((index) => filteredRoutes.length ? (index - 1 + filteredRoutes.length) % filteredRoutes.length : 0);
+                  } else if (event.key === "Enter" && filteredRoutes[highlightedIndex]) {
+                    event.preventDefault();
+                    window.location.assign(filteredRoutes[highlightedIndex].href);
+                    setOpen(false);
+                  } else if (event.key === "Escape") {
+                    event.preventDefault();
+                    setOpen(false);
+                  }
+                }}
+                placeholder="Jump to a workspace"
+                aria-label="Search workspace commands"
+                className="min-w-0 flex-1 bg-transparent text-sm text-text outline-none placeholder:text-text-muted"
+              />
               <button type="button" onClick={() => setOpen(false)} aria-label="Close command launcher" className="rounded-md p-1 text-text-muted hover:bg-surface hover:text-text"><X size={16} /></button>
             </div>
             <div className="p-2">
-              {ROUTES.map((route) => (
-                <Link key={route.href} href={route.href} onClick={() => setOpen(false)} className="flex items-center justify-between rounded-lg px-3 py-3 hover:bg-surface">
+              {filteredRoutes.length === 0 && <p className="px-3 py-5 text-center text-xs text-text-muted">No matching workspace command.</p>}
+              {filteredRoutes.map((route, index) => (
+                <Link key={route.href} href={route.href} onClick={() => setOpen(false)} className={`flex items-center justify-between rounded-lg px-3 py-3 ${index === highlightedIndex ? "bg-surface" : "hover:bg-surface"}`} aria-current={index === highlightedIndex ? "true" : undefined}>
                   <span><span className="block text-sm font-semibold text-text">{route.label}</span><span className="mt-0.5 block text-xs text-text-muted">{route.detail}</span></span>
                   <CaretRight size={16} className="text-text-faint" />
                 </Link>

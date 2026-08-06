@@ -6,17 +6,16 @@ import {
   Pulse,
   ArrowsClockwise,
   Code,
-  CreditCard,
   Gauge,
   Gear,
   Key,
-  LockKey,
   PlugsConnected,
   Robot,
   ShieldCheck,
   UsersThree,
   Vault,
 } from "@phosphor-icons/react";
+import { ARC_DOCS_URL } from "@/lib/chain";
 
 const GROUPS = [
   {
@@ -41,7 +40,6 @@ const GROUPS = [
     label: "Developer",
     items: [
       ["API keys", "/app/api-keys", Key],
-      ["Pricing", "/app/pricing", CreditCard],
     ],
   },
 ] as const;
@@ -80,17 +78,17 @@ export function SidebarNav() {
         </div>
       ))}
       <div className="border-t border-line pt-5 space-y-1">
-        <a href="https://docs.arc.network" target="_blank" rel="noreferrer" className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-[13px] font-medium text-text-muted hover:bg-surface hover:text-text">
+        <Link href="/docs" className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-[13px] font-medium text-text-muted hover:bg-surface hover:text-text">
+          <Code size={17} />
+          <span>SDK docs</span>
+        </Link>
+        <a href={ARC_DOCS_URL} target="_blank" rel="noreferrer" className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-[13px] font-medium text-text-muted hover:bg-surface hover:text-text">
           <Code size={17} />
           <span>Arc docs</span>
         </a>
-        <Link href="/app/simulations" className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-[13px] font-medium text-text-muted hover:bg-surface hover:text-text">
-          <LockKey size={17} />
-          <span>Policy simulator</span>
-        </Link>
         <Link href="/app/api-keys" className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-[13px] font-medium text-text-muted hover:bg-surface hover:text-text">
           <PlugsConnected size={17} />
-          <span>Integrations</span>
+          <span>API keys</span>
         </Link>
       </div>
     </nav>

@@ -1,9 +1,4 @@
-import { txUrl } from "@/lib/chain";
 import { Reveal } from "./Reveal";
-
-/** Real blocked-injection attempt on Arc testnet, referenced from the education page too. */
-export const BLOCKED_TX_HASH =
-  "0xe052ac2a64ddd89db770aee8586b0a91fe637ccc8ac518672ed7d2f55f7959e4";
 
 export function Problem() {
   return (
@@ -25,7 +20,7 @@ export function Problem() {
       <Reveal className="app-panel mt-10 max-w-2xl p-6 sm:p-7">
         <div className="flex items-center justify-between gap-4">
           <span className="text-xs font-medium text-text-faint">
-            On-chain evidence
+            Example policy outcome
           </span>
           <span className="rounded-full border border-blocked/30 bg-blocked-tint px-2.5 py-1 text-xs font-medium text-blocked">
             PaymentBlocked
@@ -36,21 +31,10 @@ export function Problem() {
           <dd className="text-text">RECIPIENT_NOT_ALLOWLISTED</dd>
           <dt className="text-text-faint">moved</dt>
           <dd className="text-text">0.00 USDC</dd>
-          <dt className="text-text-faint">tx</dt>
-          <dd>
-            <a
-              href={txUrl(BLOCKED_TX_HASH)}
-              target="_blank"
-              rel="noreferrer"
-              className="break-all text-accent transition-colors hover:text-text underline underline-offset-2"
-            >
-              {BLOCKED_TX_HASH}
-            </a>
-          </dd>
         </dl>
         <p className="mt-4 text-sm text-text-muted">
-          A real injected drain attempt on Arc testnet. The vault recorded it
-          and moved nothing.
+          A blocked request records the policy reason and moves zero funds. A
+          live transaction link appears only when an on-chain payment exists.
         </p>
       </Reveal>
     </section>

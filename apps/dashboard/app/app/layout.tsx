@@ -40,7 +40,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
 
           <div className="min-w-0 flex-1">
             <WorkspaceHeader />
-            <main className="mx-auto w-full max-w-[1220px] px-4 py-6 sm:px-6 sm:py-8 lg:px-8"><AppAuthGate>{children}</AppAuthGate></main>
+            <main id="main-content" className="mx-auto w-full max-w-[1220px] px-4 py-6 sm:px-6 sm:py-8 lg:px-8"><AppAuthGate>{children}</AppAuthGate></main>
           </div>
         </div>
       </div>

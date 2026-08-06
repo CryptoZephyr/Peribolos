@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
-import { fetchApi, API_BASE_URL } from "@/lib/api-client";
+import { fetchApi } from "@/lib/api-client";
 import { useToast } from "@/app/components/Toast";
 import { SkeletonTableRows } from "@/app/components/Skeleton";
 import { ExplorerBadge, CopyButton } from "@/app/components/ExplorerBadge";
@@ -13,8 +13,30 @@ export default function ActivityPage() {
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<"ALL" | "EXECUTED" | "BLOCKED">("ALL");
   const [query, setQuery] = useState("");
+  const [exporting, setExporting] = useState<"csv" | "json" | null>(null);
 
   const toast = useToast();
+
+  async function exportAudit(format: "csv" | "json") {
+    setExporting(format);
+    try {
+      const blob = await fetchApi<Blob>(`/v1/audit/export?format=${format}`, { responseType: "blob" });
+      if (blob.size === 0) throw new Error("The audit export was empty.");
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `peribolos-audit-log.${format}`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+      toast.success("Audit export ready", `${format.toUpperCase()} audit records downloaded.`);
+    } catch (err) {
+      toast.error("Audit export failed", err instanceof Error ? err.message : "Unable to download the audit records.");
+    } finally {
+      setExporting(null);
+    }
+  }
 
   useEffect(() => {
     setError(null);
@@ -57,22 +79,22 @@ export default function ActivityPage() {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <a
-            href={`${API_BASE_URL}/v1/audit/export?format=csv`}
-            download="peribolos-audit-log.csv"
-            onClick={() => toast.info("Downloading Audit Log", "CSV export requested.")}
-            className="inline-flex items-center gap-2 rounded-lg bg-text px-4 py-2.5 text-xs font-semibold text-white shadow-sm hover:bg-accent"
+          <button
+            type="button"
+            onClick={() => void exportAudit("csv")}
+            disabled={paymentRequests.length === 0 || exporting !== null}
+            className="inline-flex items-center gap-2 rounded-lg bg-text px-4 py-2.5 text-xs font-semibold text-white shadow-sm hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
           >
-            <DownloadSimple size={15} weight="bold" /> Export CSV
-          </a>
-          <a
-            href={`${API_BASE_URL}/v1/audit/export?format=json`}
-            download="peribolos-audit-log.json"
-            onClick={() => toast.info("Downloading Audit Log", "JSON export requested.")}
-            className="rounded-lg border border-line bg-surface-raised px-4 py-2.5 text-xs font-semibold text-text hover:border-line-strong hover:bg-surface"
+            <DownloadSimple size={15} weight="bold" /> {exporting === "csv" ? "Exporting…" : "Export CSV"}
+          </button>
+          <button
+            type="button"
+            onClick={() => void exportAudit("json")}
+            disabled={paymentRequests.length === 0 || exporting !== null}
+            className="rounded-lg border border-line bg-surface-raised px-4 py-2.5 text-xs font-semibold text-text hover:border-line-strong hover:bg-surface disabled:cursor-not-allowed disabled:opacity-50"
           >
-            JSON Export
-          </a>
+            {exporting === "json" ? "Exporting…" : "JSON Export"}
+          </button>
         </div>
       </div>
 

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowLeft, ShieldCheck, House } from "@phosphor-icons/react/dist/ssr";
+import { ShieldCheck, House } from "@phosphor-icons/react/dist/ssr";
 import { PeribolosLogo } from "@/app/components/PeribolosLogo";
 
 export const metadata = {
@@ -19,7 +19,7 @@ export default function NotFound() {
         </span>
       </header>
 
-      <main className="mx-auto my-auto max-w-lg text-center space-y-6">
+      <main id="main-content" className="mx-auto my-auto max-w-lg text-center space-y-6">
         <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl border border-line bg-surface-raised shadow-sm text-text-muted">
           <ShieldCheck size={32} weight="bold" className="text-accent" />
         </div>

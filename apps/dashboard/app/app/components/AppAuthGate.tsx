@@ -10,13 +10,6 @@ export function AppAuthGate({ children }: { children: ReactNode }) {
   const router = useRouter();
   const { loading, session } = useSupabaseAuth();
   const [apiKey, setApiKey] = useState<string | null>(null);
-  const [demoMode, setDemoMode] = useState(false);
-  const [demoChecked, setDemoChecked] = useState(false);
-
-  useEffect(() => {
-    setDemoMode(new URLSearchParams(window.location.search).get("demo") === "1");
-    setDemoChecked(true);
-  }, []);
 
   useEffect(() => {
     const sync = () => setApiKey(window.localStorage.getItem(API_KEY_STORAGE));
@@ -34,10 +27,10 @@ export function AppAuthGate({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    if (demoChecked && !loading && !session && !apiKey && !demoMode) router.replace("/login");
-  }, [loading, session, apiKey, demoMode, demoChecked, router]);
+    if (!loading && !session && !apiKey) router.replace("/login");
+  }, [loading, session, apiKey, router]);
 
-  if (!demoChecked || (loading && !demoMode) || (!session && !apiKey && !demoMode)) {
+  if (loading || (!session && !apiKey)) {
     return <div className="flex min-h-[40vh] items-center justify-center text-sm text-text-muted">Checking your Peribolos session…</div>;
   }
 

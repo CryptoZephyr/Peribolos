@@ -21,6 +21,9 @@ export default function SecurityPage() {
           <p>
             Peribolos shifts financial control from the LLM context to on-chain smart contracts (<code className="text-accent font-mono">PeribolosVault.sol</code>). Even if an adversary achieves 100% prompt injection control over an agent&apos;s LLM, the on-chain vault rejects any transaction that breaches per-tx limits, daily caps, or un-allowlisted recipients.
           </p>
+          <p>
+            Vault owners retain control of vault assets and owner-authorized changes. Hosted agent execution is different: Circle Developer-Controlled Wallets manage agent signing keys server-side, and those keys are never exposed to the browser.
+          </p>
         </div>
 
         <div className="rounded-xl border border-line bg-surface-raised p-6 space-y-4">

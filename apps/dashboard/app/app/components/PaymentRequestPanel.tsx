@@ -2,12 +2,12 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { ArrowSquareOut, CheckCircle, PaperPlaneTilt, WarningCircle } from "@phosphor-icons/react";
+import { ArrowSquareOut, CheckCircle, PaperPlaneTilt, Prohibit, ShieldCheck, WarningCircle } from "@phosphor-icons/react";
 import { fetchApi } from "@/lib/api-client";
 import { useToast } from "@/app/components/Toast";
 
 type Payee = { id: string; name: string; address: string; verified?: boolean };
-type Result = { status: string; txHash?: string; explorerUrl?: string; description?: string };
+type Result = { status: string; txHash?: string; explorerUrl?: string; description?: string; blockReasonCode?: string; blockReasonDescription?: string };
 
 const API_KEY_STORAGE_KEY = "peribolos.apiKey.v1";
 
@@ -70,10 +70,13 @@ export function PaymentRequestPanel() {
         }),
       });
       setResult(response);
-      toast.success(
-        response.status === "EXECUTED" ? "Payment executed" : "Payment decision recorded",
-        response.status === "EXECUTED" ? "The transaction is now in Activity & audit." : "Peribolos recorded the policy outcome.",
-      );
+      if (response.status === "EXECUTED") {
+        toast.success("Payment executed", "The transaction is now in Activity & audit.");
+      } else if (response.status === "BLOCKED") {
+        toast.info("Payment blocked by policy", response.blockReasonCode || "The vault prevented funds from moving.");
+      } else {
+        toast.error("Payment failed", response.blockReasonCode || "The payment did not execute.");
+      }
       setConfirmed(false);
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "Payment request failed.");
@@ -131,9 +134,28 @@ export function PaymentRequestPanel() {
         )}
         {error && <div role="alert" className="mt-4 flex items-start gap-2 rounded-lg border border-rose-500/25 bg-rose-500/5 px-3 py-3 text-xs text-rose-200"><WarningCircle size={15} className="mt-0.5 shrink-0" /> <span>{error}</span></div>}
         {result && (
-          <div role="status" className="mt-4 flex flex-col gap-2 rounded-lg border border-emerald-500/25 bg-emerald-500/5 px-3 py-3 text-xs text-emerald-200 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex items-start gap-2"><CheckCircle size={15} className="mt-0.5 shrink-0" /><span>{result.status === "EXECUTED" ? "Executed on Arc testnet." : `Request recorded as ${result.status}.`}</span></div>
-            {result.explorerUrl && <a href={result.explorerUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 font-semibold text-emerald-300 hover:underline">View proof <ArrowSquareOut size={13} /></a>}
+          <div
+            role="status"
+            className={`mt-4 flex flex-col gap-2 rounded-lg border px-3 py-3 text-xs sm:flex-row sm:items-center sm:justify-between ${
+              result.status === "EXECUTED"
+                ? "border-emerald-500/25 bg-emerald-500/5 text-emerald-200"
+                : result.status === "BLOCKED"
+                  ? "border-blocked/25 bg-blocked-tint text-blocked"
+                  : "border-rose-500/25 bg-rose-500/5 text-rose-200"
+            }`}
+          >
+            <div className="flex items-start gap-2">
+              {result.status === "EXECUTED" ? <CheckCircle size={15} className="mt-0.5 shrink-0" /> : result.status === "BLOCKED" ? <ShieldCheck size={15} className="mt-0.5 shrink-0" /> : <Prohibit size={15} className="mt-0.5 shrink-0" />}
+              <span>
+                {result.status === "EXECUTED"
+                  ? "Executed on Arc testnet."
+                  : result.status === "BLOCKED"
+                    ? `Blocked by policy: ${result.blockReasonCode || "policy rule"}.`
+                    : `Payment failed: ${result.blockReasonCode || "the request did not execute"}.`}
+                {result.status === "BLOCKED" && result.blockReasonDescription && <span className="mt-1 block text-[11px] opacity-80">{result.blockReasonDescription}</span>}
+              </span>
+            </div>
+            {result.explorerUrl && <a href={result.explorerUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 font-semibold hover:underline">View proof <ArrowSquareOut size={13} /></a>}
           </div>
         )}
       </div>

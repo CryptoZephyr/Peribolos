@@ -279,6 +279,7 @@ export default function VaultsPage() {
             (() => {
               const chainState = chainStates[vault.id];
               const paused = chainState?.paused ?? vault.paused;
+              const pauseStateDiverges = Boolean(chainState && chainState.paused !== vault.paused);
               return (
             <div
               key={vault.id}
@@ -320,7 +321,7 @@ export default function VaultsPage() {
                   <button
                     onClick={() => togglePause(vault)}
                     className={`rounded-md px-3 py-1.5 text-xs font-semibold text-white transition-opacity ${
-                      vault.paused ? "bg-emerald-600 hover:bg-emerald-500" : "bg-rose-600 hover:bg-rose-500"
+                      paused ? "bg-emerald-600 hover:bg-emerald-500" : "bg-rose-600 hover:bg-rose-500"
                     }`}
                   >
                     {paused ? "Unpause Vault" : "Pause Vault"}
@@ -366,6 +367,12 @@ export default function VaultsPage() {
               {vault.mode === "live" && chainState && chainState.agentKey.toLowerCase() !== (vault.agentSignerAddress || "").toLowerCase() && (
                 <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-200">
                   Arc reports a different <code className="font-mono">agentKey</code> than the workspace record. Payments remain blocked until the owner rotation is confirmed.
+                </div>
+              )}
+
+              {pauseStateDiverges && (
+                <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-200">
+                  The workspace pause flag differs from Arc. The button above follows the authoritative chain state; refresh after confirming the owner action.
                 </div>
               )}
 

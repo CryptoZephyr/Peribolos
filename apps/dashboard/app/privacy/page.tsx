@@ -5,7 +5,7 @@ import { ShieldCheck } from "@phosphor-icons/react/dist/ssr";
 
 export const metadata = {
   title: "Privacy Policy | Peribolos",
-  description: "Learn how Peribolos handles data privacy, non-custodial smart vault policies, and agent telemetry.",
+  description: "Learn how Peribolos handles data privacy, smart vault policies, and agent telemetry.",
 };
 
 export default function PrivacyPage() {
@@ -22,16 +22,16 @@ export default function PrivacyPage() {
             </div>
             <h1 className="mt-3 text-3xl font-bold tracking-tight text-text sm:text-4xl">Privacy Policy</h1>
             <p className="mt-2 text-sm text-text-muted">
-              Effective Date: August 1, 2026 · Version 2.0 (Arc Testnet Edition)
+              Effective Date: August 1, 2026 (Arc Testnet Edition)
             </p>
           </div>
 
           {/* Content */}
           <article className="prose prose-slate max-w-none text-sm leading-relaxed text-text-muted space-y-8">
             <section className="space-y-3">
-              <h2 className="text-lg font-bold text-text">1. Overview & Non-Custodial Architecture</h2>
+              <h2 className="text-lg font-bold text-text">1. Overview & custody model</h2>
               <p>
-                Peribolos (&quot;we&quot;, &quot;us&quot;, or &quot;our&quot;) provides smart contract-enforced vault policy software for autonomous AI agents on the Arc Blockchain Network. We operate on a strictly non-custodial, decentralized basis. We do not hold private keys, manage custody of funds, or track personal identity beyond the minimum necessary technical credentials required to authenticate your workspace.
+                Peribolos (&quot;we&quot;, &quot;us&quot;, or &quot;our&quot;) provides smart contract-enforced vault policy software for autonomous AI agents on the Arc Blockchain Network. Owners retain control of vault assets and owner-authorized contract actions. For hosted agent execution, Circle Developer-Controlled Wallets manage agent signing keys server-side; those keys are not exposed to the browser. We collect only the technical credentials and workspace records needed to operate the service.
               </p>
             </section>
 

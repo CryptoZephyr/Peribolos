@@ -5,7 +5,7 @@ import { LockKey } from "@phosphor-icons/react/dist/ssr";
 
 export const metadata = {
   title: "Terms of Service | Peribolos",
-  description: "Terms of Service governing the use of Peribolos non-custodial smart vault policies on Arc.",
+  description: "Terms of Service governing the use of Peribolos smart vault policies on Arc.",
 };
 
 export default function TermsPage() {
@@ -22,7 +22,7 @@ export default function TermsPage() {
             </div>
             <h1 className="mt-3 text-3xl font-bold tracking-tight text-text sm:text-4xl">Terms of Service</h1>
             <p className="mt-2 text-sm text-text-muted">
-              Effective Date: August 1, 2026 · Version 2.0 (Arc Testnet Edition)
+              Effective Date: August 1, 2026 (Arc Testnet Edition)
             </p>
           </div>
 
@@ -36,9 +36,9 @@ export default function TermsPage() {
             </section>
 
             <section className="space-y-3">
-              <h2 className="text-lg font-bold text-text">2. Non-Custodial Smart Vault Protocol</h2>
+              <h2 className="text-lg font-bold text-text">2. Smart vault and signer model</h2>
               <p>
-                Peribolos provides decentralized smart contract software deployed on the Arc Blockchain Network. Peribolos is non-custodial: you retain sole ownership and control over your vault assets and signing authority. The Platform executes spending constraints (daily caps, per-tx caps, recipient allowlists) directly via smart contract bytecode.
+                Peribolos provides smart contract software deployed on the Arc Blockchain Network. You retain control over vault assets and owner-authorized changes. The hosted agent path uses Circle Developer-Controlled Wallets to manage agent signing keys server-side; those keys are not held in the browser. The Platform executes spending constraints (daily caps, per-tx caps, recipient allowlists) directly via smart contract bytecode.
               </p>
             </section>
 

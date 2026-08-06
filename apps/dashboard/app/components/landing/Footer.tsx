@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { FACTORY_ADDRESS, addressUrl } from "@/lib/chain";
+import { ARC_DOCS_URL, FACTORY_ADDRESS, addressUrl } from "@/lib/chain";
 import { LandingBrand } from "./LandingBrand";
 
 export function Footer() {
@@ -16,7 +16,10 @@ export function Footer() {
           >
             Factory contract
           </a>
-          <a href="https://docs.arc.network" target="_blank" rel="noreferrer" className="transition-colors hover:text-text">
+          <Link href="/docs" className="transition-colors hover:text-text">
+            SDK docs
+          </Link>
+          <a href={ARC_DOCS_URL} target="_blank" rel="noreferrer" className="transition-colors hover:text-text">
             Arc docs
           </a>
           <Link href="/login" className="transition-colors hover:text-text">

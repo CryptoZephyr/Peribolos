@@ -5,6 +5,7 @@ import { fetchApi } from "@/lib/api-client";
 import { useToast } from "@/app/components/Toast";
 import { SkeletonTableRows } from "@/app/components/Skeleton";
 import { CopyButton } from "@/app/components/ExplorerBadge";
+import { Modal } from "@/app/components/Modal";
 
 export default function ApiKeysPage() {
   const [apiKeys, setApiKeys] = useState<any[]>([]);
@@ -12,6 +13,8 @@ export default function ApiKeysPage() {
   const [keyName, setKeyName] = useState("");
   const [keyRole, setKeyRole] = useState<"agent" | "operator">("agent");
   const [newRawKey, setNewRawKey] = useState<string | null>(null);
+  const [keyToRevoke, setKeyToRevoke] = useState<any | null>(null);
+  const [revoking, setRevoking] = useState(false);
 
   const toast = useToast();
 
@@ -49,6 +52,21 @@ export default function ApiKeysPage() {
       loadKeys();
     } catch (err: any) {
       toast.error("Key Generation Failed", err.message);
+    }
+  }
+
+  async function revokeKey() {
+    if (!keyToRevoke) return;
+    setRevoking(true);
+    try {
+      await fetchApi(`/v1/api-keys/${keyToRevoke.id}/revoke`, { method: "POST" });
+      toast.success("API key revoked", `${keyToRevoke.name} can no longer authenticate requests.`);
+      setKeyToRevoke(null);
+      await loadKeys();
+    } catch (err: any) {
+      toast.error("Key revocation failed", err.message);
+    } finally {
+      setRevoking(false);
     }
   }
 
@@ -133,7 +151,8 @@ export default function ApiKeysPage() {
                 <th className="px-4 py-3 font-semibold">Key Prefix</th>
                 <th className="px-4 py-3 font-semibold">Status</th>
                 <th className="px-4 py-3 font-semibold">Last Used</th>
-                <th className="px-4 py-3 font-semibold text-right">Created</th>
+                <th className="px-4 py-3 font-semibold">Created</th>
+                <th className="px-4 py-3 font-semibold text-right">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-line">
@@ -147,7 +166,7 @@ export default function ApiKeysPage() {
                   </td>
                   <td className="px-4 py-3 font-mono text-accent">{key.keyPrefix}...</td>
                   <td className="px-4 py-3">
-                    <span className="px-2 py-0.5 rounded font-mono text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
+                    <span className={`px-2 py-0.5 rounded font-mono text-[10px] font-bold border ${key.status === "active" ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30" : "bg-rose-500/10 text-rose-300 border-rose-500/30"}`}>
                       {key.status}
                     </span>
                   </td>
@@ -157,12 +176,31 @@ export default function ApiKeysPage() {
                   <td className="px-4 py-3 text-text-muted text-right">
                     {new Date(key.createdAt).toLocaleDateString()}
                   </td>
+                  <td className="px-4 py-3 text-right">
+                    {key.status === "active" ? (
+                      <button type="button" onClick={() => setKeyToRevoke(key)} className="rounded-md border border-rose-500/30 px-2.5 py-1.5 text-[11px] font-semibold text-rose-300 hover:bg-rose-500/10">
+                        Revoke
+                      </button>
+                    ) : <span className="text-[11px] text-text-faint">Unavailable</span>}
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
       )}
+
+      <Modal
+        isOpen={Boolean(keyToRevoke)}
+        onClose={() => { if (!revoking) setKeyToRevoke(null); }}
+        title="Revoke API key"
+        confirmLabel="Revoke key"
+        confirmVariant="danger"
+        onConfirm={() => void revokeKey()}
+        loading={revoking}
+      >
+        <p>Revoke <strong className="text-text">{keyToRevoke?.name}</strong>? Any agent using this credential will be rejected immediately, and this cannot be undone.</p>
+      </Modal>
     </div>
   );
 }

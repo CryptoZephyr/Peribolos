@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import Link from "next/link";
-import { ArrowsClockwise, ShieldCheck, House } from "@phosphor-icons/react";
+import { ArrowsClockwise, WarningCircle, House } from "@phosphor-icons/react";
 import { PeribolosLogo } from "@/app/components/PeribolosLogo";
 
 export default function GlobalError({
@@ -23,22 +23,22 @@ export default function GlobalError({
           <PeribolosLogo size={28} showBadge={false} />
         </Link>
         <span className="text-xs font-mono font-medium text-blocked bg-blocked-tint px-2.5 py-1 rounded-md border border-blocked/20">
-          Runtime Protection Triggered
+          Application error
         </span>
       </header>
 
-      <main className="mx-auto my-auto max-w-lg text-center space-y-6">
+      <main id="main-content" className="mx-auto my-auto max-w-lg text-center space-y-6">
         <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl border border-blocked/30 bg-blocked-tint text-blocked">
-          <ShieldCheck size={32} weight="bold" />
+          <WarningCircle size={32} weight="bold" />
         </div>
 
         <div className="space-y-2">
-          <p className="eyebrow text-blocked">Workspace Session Exception</p>
+          <p className="eyebrow text-blocked">Workspace could not render</p>
           <h1 className="text-3xl font-bold tracking-tight text-text sm:text-4xl">
             An unexpected error occurred.
           </h1>
           <p className="text-sm leading-relaxed text-text-muted">
-            The workspace encountered an isolated client exception. Your underlying agent vaults and on-chain policies remain completely secure and enforced.
+            The dashboard encountered an unexpected client error. This message does not verify the state of any vault; check Activity or ArcScan before relying on a payment result.
           </p>
           {error.digest && (
             <p className="text-[11px] font-mono text-text-faint bg-surface-raised border border-line p-2 rounded-md">

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { fetchApi } from "@/lib/api-client";
 import { useToast } from "@/app/components/Toast";
-import { ExplorerBadge, CopyButton } from "@/app/components/ExplorerBadge";
+import { ExplorerBadge } from "@/app/components/ExplorerBadge";
 
 export default function SimulationsPage() {
   const [scenarios, setScenarios] = useState<any[]>([]);
@@ -181,12 +181,9 @@ export default function SimulationsPage() {
 
               <div className="flex items-center justify-between pt-1 text-xs">
                 {simulationResult.explorerUrl ? (
-                  <ExplorerBadge type="address" hashOrAddress={simulationResult.attemptedPayment?.payeeAddress} label="View Vault on Arcscan ↗" />
+                  <ExplorerBadge type="address" hashOrAddress={simulationResult.vaultAddress} label="View Vault on Arcscan ↗" />
                 ) : (
                   <span className="text-text-muted text-[11px] font-mono">Vault Mode: Policy Simulator</span>
-                )}
-                {simulationResult.shareableReportUrl && (
-                  <CopyButton text={simulationResult.shareableReportUrl} label="Copy Audit Report Link" />
                 )}
               </div>
             </div>

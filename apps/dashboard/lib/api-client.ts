@@ -1,11 +1,7 @@
 import { supabase } from './supabase';
 
-export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3400';
+export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || (process.env.NODE_ENV === 'development' ? 'http://localhost:3400' : '');
 const CONFIGURED_API_KEY = process.env.NEXT_PUBLIC_PERIBOLOS_API_KEY;
-
-export function isLocalDemoApi(): boolean {
-  return false;
-}
 
 function resolveApiKey(): string | undefined {
   if (CONFIGURED_API_KEY) return CONFIGURED_API_KEY;
@@ -26,7 +22,12 @@ async function getSessionForRequest() {
   }
 }
 
-export async function fetchApi<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+type ApiRequestInit = RequestInit & { responseType?: "json" | "blob" };
+
+export async function fetchApi<T>(endpoint: string, options: ApiRequestInit = {}): Promise<T> {
+  if (!API_BASE_URL) {
+    throw new Error("Peribolos API is not configured for this deployment.");
+  }
   const url = `${API_BASE_URL}${endpoint}`;
   const apiKey = resolveApiKey();
   // A saved management key identifies the workspace whose agents, vaults and
@@ -38,15 +39,16 @@ export async function fetchApi<T>(endpoint: string, options: RequestInit = {}): 
   const controller = new AbortController();
   const timeout = window.setTimeout(() => controller.abort(), 5_000);
   let res: Response;
+  const { responseType = "json", ...requestOptions } = options;
 
   try {
     res = await fetch(url, {
-      ...options,
-      signal: options.signal ?? controller.signal,
+      ...requestOptions,
+      signal: requestOptions.signal ?? controller.signal,
       headers: {
         'Content-Type': 'application/json',
         ...(bearer ? { Authorization: `Bearer ${bearer}` } : {}),
-        ...options.headers,
+        ...requestOptions.headers,
       },
     });
   } finally {
@@ -61,5 +63,5 @@ export async function fetchApi<T>(endpoint: string, options: RequestInit = {}): 
     throw new Error(errorBody.message || errorBody.blockReasonDescription || errorBody.blockReasonCode || `API error ${res.status}`);
   }
 
-  return res.json() as Promise<T>;
+  return (responseType === "blob" ? res.blob() : res.json()) as Promise<T>;
 }

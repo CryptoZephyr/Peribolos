@@ -17,7 +17,7 @@ const POINTS = [
   {
     icon: Fingerprint,
     title: "ERC-8004 identity",
-    body: "Every vault mints the agent an on-chain identity NFT at creation, so who is spending is verifiable, not just claimed by the client.",
+    body: "Vault creation requests an ERC-8004 identity registration when the registry is available. Registration is best-effort, so verify the identity record before relying on it.",
   },
   {
     icon: Code,

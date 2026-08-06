@@ -2,6 +2,7 @@
 
 import { ArrowUpRight } from "@phosphor-icons/react";
 import { Reveal } from "./Reveal";
+import { ARC_DOCS_URL } from "@/lib/chain";
 
 const SIGNALS = [
   { value: "USDC", label: "native gas and balances" },
@@ -22,7 +23,7 @@ export function ArcSignals() {
             Peribolos uses Arc as the settlement layer for agent wallets, so policy, identity, and USDC movement live in the same programmable environment.
           </p>
           <div className="mt-6 flex flex-wrap gap-x-5 gap-y-3 text-sm">
-            <a href="https://docs.arc.io/arc-chain" target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 font-semibold text-text underline decoration-accent/40 underline-offset-4 transition-colors hover:text-accent">
+            <a href={ARC_DOCS_URL} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 font-semibold text-text underline decoration-accent/40 underline-offset-4 transition-colors hover:text-accent">
               Explore Arc docs
               <ArrowUpRight size={14} weight="bold" aria-hidden />
             </a>

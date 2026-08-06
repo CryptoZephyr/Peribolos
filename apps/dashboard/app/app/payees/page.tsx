@@ -40,7 +40,7 @@ export default function PayeesPage() {
         method: "POST",
         body: JSON.stringify({ name, address, category, description }),
       });
-      toast.success("Payee Added", `${name} added to approved on-chain registry.`);
+      toast.success("Payee added", `${name} is now on this workspace's payment allowlist. This dashboard record does not submit an on-chain transaction.`);
       setShowModal(false);
       setName("");
       setAddress("");
@@ -104,7 +104,7 @@ export default function PayeesPage() {
                     <h3 className="text-sm font-bold text-text">{payee.name}</h3>
                     {payee.verified && (
                       <span className="inline-flex items-center gap-1 rounded bg-accent-tint border border-accent/20 px-1.5 py-0.5 text-[9px] font-bold text-accent">
-                        <ShieldCheck size={11} weight="bold" /> VERIFIED
+                        <ShieldCheck size={11} weight="bold" /> WORKSPACE ALLOWLIST
                       </span>
                     )}
                   </div>
@@ -116,7 +116,7 @@ export default function PayeesPage() {
               </div>
 
               <div className="border-t border-line pt-3 flex items-center justify-between text-xs">
-                <span className="text-text-muted">On-chain Address:</span>
+                <span className="text-text-muted">Recipient Address:</span>
                 <div className="flex items-center gap-2">
                   <ExplorerBadge type="address" hashOrAddress={payee.address} />
                   <CopyButton text={payee.address} />

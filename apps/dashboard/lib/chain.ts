@@ -24,6 +24,7 @@ export const USDC = USDC_ADDRESS;
 export const IDENTITY_REGISTRY = IDENTITY_REGISTRY_ADDRESS;
 export const EXPLORER = ARC_TESTNET.explorer;
 export const CHAIN_ID = ARC_TESTNET.id;
+export const ARC_DOCS_URL = "https://docs.arc.io";
 
 /**
  * Funding helpers. The Circle Faucet dispenses Arc-testnet USDC directly (this
@@ -31,7 +32,7 @@ export const CHAIN_ID = ARC_TESTNET.id;
  * CCTP flow documented in the Arc App Kit bridge guide.
  */
 export const FAUCET_URL = "https://faucet.circle.com";
-export const BRIDGE_DOCS_URL = "https://docs.arc.network/app-kit/bridge";
+export const BRIDGE_DOCS_URL = `${ARC_DOCS_URL}/app-kit/bridge`;
 
 /** Primary RPC string (for display / wallet transport). */
 export const rpcUrl = resolveArcRpcUrl(process.env.NEXT_PUBLIC_RPC_URL);

@@ -6,13 +6,10 @@ import { useRouter } from "next/navigation";
 import {
   ArrowRight,
   ShieldCheck,
-  Check,
   Wallet,
   Key,
   EnvelopeSimple,
   Globe,
-  LockKey,
-  Sparkle,
 } from "@phosphor-icons/react";
 import { useSupabaseAuth } from "@/app/auth/SupabaseAuthProvider";
 import { PeribolosLogo } from "@/app/components/PeribolosLogo";
@@ -21,10 +18,7 @@ export default function LoginPage() {
   const router = useRouter();
   const { configured, loading, session, signInWithOtp, signInWithWeb3, signInWithPasskey } = useSupabaseAuth();
 
-  // Mode and form states
-  const [mode, setMode] = useState<"signup" | "login">("signup");
   const [email, setEmail] = useState("");
-  const [subscribeUpdates, setSubscribeUpdates] = useState(true);
   const [walletAvailable, setWalletAvailable] = useState<boolean | null>(null);
   const [passkeyAvailable, setPasskeyAvailable] = useState<boolean | null>(null);
 
@@ -34,7 +28,6 @@ export default function LoginPage() {
   const [methodBusy, setMethodBusy] = useState<"web3" | "passkey" | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // Left panel interactive preview tab state (inspired by reference image widget)
   const [activePreviewTab, setActivePreviewTab] = useState<"firewall" | "usdc">("firewall");
 
   useEffect(() => {
@@ -70,7 +63,7 @@ export default function LoginPage() {
     setError(null);
     setSent(false);
     if (method === "web3" && walletAvailable === false) {
-      setError("No Ethereum wallet detected. Open Peribolos in a browser with MetaMask, Rabby, or another injected wallet.");
+      setError("No Ethereum wallet detected. Open Peribolos in a browser with an injected wallet.");
       return;
     }
     if (method === "passkey" && passkeyAvailable === false) {
@@ -94,11 +87,11 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="min-h-[100dvh] bg-[#eef0f3] p-4 sm:p-6 lg:p-10 flex items-center justify-center font-sans antialiased">
+    <main id="main-content" className="min-h-[100dvh] bg-[#eef0f3] p-4 sm:p-6 lg:p-10 flex items-center justify-center font-sans antialiased">
       {/* Main Split-Card Container */}
       <div className="w-full max-w-[1140px] bg-white rounded-[32px] overflow-hidden border border-slate-200/80 shadow-[0_24px_70px_rgba(15,23,42,0.08)] grid grid-cols-1 lg:grid-cols-12 lg:min-h-[680px]">
         
-        {/* LEFT PANEL - Visual Showcase & Interactive Policy Card (Matching reference design) */}
+        {/* LEFT PANEL - Policy overview */}
         <section className="relative hidden lg:flex lg:col-span-6 flex-col justify-between bg-[#f5f7fa] p-10 xl:p-12 border-r border-slate-100/90 overflow-hidden select-none">
           {/* Top brand bar */}
           <div className="relative z-10 flex items-center justify-between">
@@ -106,7 +99,7 @@ export default function LoginPage() {
             <span className="text-[11px] font-semibold tracking-[0.08em] text-slate-500">ARC TESTNET</span>
           </div>
 
-          {/* CENTER FLOATING CARD (Directly mirroring the voice aura interactive widget) */}
+          {/* CENTER FLOATING CARD */}
           <div className="relative z-10 mx-auto my-auto w-full max-w-[430px] rounded-2xl border border-slate-200/70 bg-white/95 p-5 shadow-[0_18px_45px_rgba(15,23,42,0.08)] backdrop-blur-md">
             {/* Widget Header Tabs */}
             <div className="flex items-center gap-1 border-b border-slate-100 pb-3">
@@ -141,49 +134,21 @@ export default function LoginPage() {
             <p className="mt-3.5 text-xs leading-relaxed text-slate-600">
               {activePreviewTab === "firewall"
                 ? "Unlock zero-trust security for autonomous AI agents. Enforce daily spending limits, allowlisted contracts, and instant payment validation."
-                : "Non-custodial smart vault policies powered by Circle DCW. Prevent unauthorized agent drains before transactions hit the mempool."}
+                : "Server-managed agent signing with smart vault policies. Prevent unauthorized agent drains before transactions hit the mempool."}
             </p>
 
-            {/* Interactive Category Chips / Pills */}
+            {/* Policy facts that are true without workspace data */}
             <div className="mt-4 flex flex-wrap items-center gap-1.5 pt-1">
-              {activePreviewTab === "firewall" ? (
-                <>
-                  <span className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-medium text-slate-700">
-                    <Globe size={12} className="text-emerald-600" /> Arc Testnet
-                  </span>
-                  <span className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-medium text-slate-700">
-                    <ShieldCheck size={12} className="text-emerald-600" /> $500/day Cap
-                  </span>
-                  <span className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-medium text-slate-700">
-                    <LockKey size={12} className="text-emerald-600" /> 18 Allowlisted
-                  </span>
-                  <span className="inline-flex items-center gap-1 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-700">
-                    <Check size={12} weight="bold" /> Enforced
-                  </span>
-                </>
-              ) : (
-                <>
-                  <span className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-medium text-slate-700">
-                    <Wallet size={12} className="text-emerald-600" /> Circle DCW
-                  </span>
-                  <span className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-medium text-slate-700">
-                    <Sparkle size={12} className="text-emerald-600" /> Smart Vault
-                  </span>
-                  <span className="inline-flex items-center gap-1 rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-1 text-[11px] font-medium text-rose-700">
-                    12 Blocked
-                  </span>
-                  <span className="inline-flex items-center gap-1 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-700">
-                    <Check size={12} weight="bold" /> Vault V2
-                  </span>
-                </>
-              )}
+              <span className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-medium text-slate-700"><Globe size={12} className="text-emerald-600" /> Arc Testnet</span>
+              <span className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-medium text-slate-700"><ShieldCheck size={12} className="text-emerald-600" /> Policy preflight</span>
+              <span className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-medium text-slate-700"><Wallet size={12} className="text-emerald-600" /> Managed agent signer</span>
             </div>
           </div>
 
           {/* Bottom Left Headline & Subtext */}
           <div className="relative z-10 max-w-md pt-6">
             <h2 className="font-sans text-3xl font-semibold tracking-[-0.04em] text-slate-900 xl:text-4xl leading-[1.08]">
-              One Click Away from Studio-Grade Security
+              Rules that hold before funds move
             </h2>
             <p className="mt-2.5 text-xs sm:text-sm text-slate-500 leading-relaxed">
               A spending wall your autonomous AI agents cannot pass without explicit contract policy validation.
@@ -215,13 +180,9 @@ export default function LoginPage() {
           <div className="max-w-[400px] w-full mx-auto my-auto">
             {/* Form Header Title */}
             <div>
-              <h1 className="font-sans text-3xl sm:text-3xl font-semibold tracking-[-0.04em] text-slate-900">
-                {mode === "signup" ? "Create an account" : "Welcome back"}
-              </h1>
+              <h1 className="font-sans text-3xl sm:text-3xl font-semibold tracking-[-0.04em] text-slate-900">Sign in to Peribolos</h1>
               <p className="mt-2 text-xs sm:text-sm text-slate-500 leading-relaxed">
-                {mode === "signup"
-                  ? "Sign in, connect your owner wallet, and verify one protected payment."
-                  : "Return to your protected agent workspace."}
+                Sign in, connect your owner wallet, and verify one protected payment.
               </p>
             </div>
 
@@ -229,23 +190,9 @@ export default function LoginPage() {
               <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-emerald-700">What happens next</p>
               <ol className="mt-3 grid gap-2 text-xs text-slate-600 sm:grid-cols-3 lg:grid-cols-1">
                 <li className="flex gap-2"><span className="font-mono font-semibold text-slate-900">01</span><span>Sign in and register this device.</span></li>
-                <li className="flex gap-2"><span className="font-mono font-semibold text-slate-900">02</span><span>Connect Rabby and create your vault.</span></li>
+                <li className="flex gap-2"><span className="font-mono font-semibold text-slate-900">02</span><span>Connect your owner wallet and create your vault.</span></li>
                 <li className="flex gap-2"><span className="font-mono font-semibold text-slate-900">03</span><span>Run one small payment and keep the proof.</span></li>
               </ol>
-            </div>
-
-            {/* Security updates checkbox (matching reference design) */}
-            <div className="mt-5 flex items-start gap-2.5">
-              <input
-                id="subscribe-updates"
-                type="checkbox"
-                checked={subscribeUpdates}
-                onChange={(e) => setSubscribeUpdates(e.target.checked)}
-                className="mt-0.5 h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-900"
-              />
-              <label htmlFor="subscribe-updates" className="text-xs text-slate-600 select-none cursor-pointer">
-                Send me security tips, updates and policy advisories
-              </label>
             </div>
 
             {/* Main Auth Form */}
@@ -275,7 +222,7 @@ export default function LoginPage() {
 
               {/* Terms of Service Disclaimer */}
               <p className="text-[11px] leading-relaxed text-slate-500 pt-1">
-                {mode === "signup" ? "By creating an account, you accept Peribolos " : "By continuing, you accept Peribolos "}
+                By continuing, you accept Peribolos{" "}
                 <Link href="/privacy" className="font-semibold text-slate-800 underline underline-offset-2">
                   privacy policy
                 </Link>{" "}
@@ -304,7 +251,7 @@ export default function LoginPage() {
               <span className="h-px flex-1 bg-slate-200" />
             </div>
 
-            {/* OAuth / Web3 / Passkey Buttons (Matching reference layout) */}
+            {/* OAuth / Web3 / Passkey Buttons */}
             <div className="space-y-2.5">
               <button
                 type="button"
@@ -329,22 +276,6 @@ export default function LoginPage() {
 
             <p className="mt-3 text-center text-[11px] leading-relaxed text-slate-400">
               New to passkeys? Sign in with email first, then register this device from Settings.
-            </p>
-
-            {/* Already have an account? Log In toggle */}
-            <p className="mt-5 text-center text-xs text-slate-500">
-              {mode === "signup" ? "Already have an account?" : "Don't have an account?"}{" "}
-              <button
-                type="button"
-                onClick={() => {
-                  setMode(mode === "signup" ? "login" : "signup");
-                  setError(null);
-                  setSent(false);
-                }}
-                className="font-semibold text-slate-900 underline underline-offset-2 hover:text-emerald-700 transition-colors"
-              >
-                {mode === "signup" ? "Log In" : "Sign Up"}
-              </button>
             </p>
 
             {/* Notification messages */}

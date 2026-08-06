@@ -33,7 +33,7 @@ export function ProductPreview() {
                   <p className="text-[11px] text-text-faint">Arc testnet policies</p>
                 </div>
               </div>
-              <span className="text-[11px] font-medium text-text-faint">Policy snapshot</span>
+              <span className="text-[11px] font-medium text-text-faint">Illustrative policy snapshot</span>
             </div>
 
             <div className="grid gap-3 border-b border-line bg-surface px-4 py-4 sm:grid-cols-3 sm:gap-4 sm:px-5">

@@ -691,6 +691,15 @@ class DatabaseStore {
   public getApiKeyByHash(hash: string) {
     return this.data.apiKeys.find(k => k.keyHash === hash && k.status === 'active');
   }
+  public revokeApiKey(workspaceId: string, keyId: string): ApiKeyRecord | undefined {
+    const key = this.data.apiKeys.find(k => k.id === keyId && k.workspaceId === workspaceId);
+    if (!key) return undefined;
+    if (key.status !== 'revoked') {
+      key.status = 'revoked';
+      this.save();
+    }
+    return key;
+  }
   public addPaymentRequest(pr: PaymentRequestRecord) {
     this.data.paymentRequests.unshift(pr);
     this.save();

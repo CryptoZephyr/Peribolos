@@ -4,12 +4,9 @@ import { useEffect, useState } from "react";
 import {
   Gear,
   ShieldCheck,
-  Bell,
   Globe,
   Key,
   Check,
-  LockKey,
-  Wallet,
   Trash,
 } from "@phosphor-icons/react";
 import { useToast } from "@/app/components/Toast";
@@ -24,16 +21,12 @@ import {
 export default function WorkspaceSettingsPage() {
   const toast = useToast();
   const { configured, session, registerPasskey, listPasskeys, deletePasskey } = useSupabaseAuth();
-  const [activeTab, setActiveTab] = useState<"general" | "security" | "network" | "webhooks">("general");
+  const [activeTab, setActiveTab] = useState<"general" | "security" | "network">("general");
 
   // Form states
   const [workspaceName, setWorkspaceName] = useState(DEFAULT_WORKSPACE_SETTINGS.workspaceName);
   const [defaultDailyCap, setDefaultDailyCap] = useState(DEFAULT_WORKSPACE_SETTINGS.defaultDailyCap);
   const [defaultPerTxCap, setDefaultPerTxCap] = useState(DEFAULT_WORKSPACE_SETTINGS.defaultPerTxCap);
-  const [require2FA, setRequire2FA] = useState(DEFAULT_WORKSPACE_SETTINGS.require2FA);
-  const [autoPauseOnAnomaly, setAutoPauseOnAnomaly] = useState(DEFAULT_WORKSPACE_SETTINGS.autoPauseOnAnomaly);
-  const [rpcEndpoint, setRpcEndpoint] = useState(rpcUrl);
-  const [webhookUrl, setWebhookUrl] = useState("");
   const [saving, setSaving] = useState(false);
   const [registeringPasskey, setRegisteringPasskey] = useState(false);
   const [activePasskeys, setActivePasskeys] = useState<Awaited<ReturnType<typeof listPasskeys>>>([]);
@@ -67,10 +60,6 @@ export default function WorkspaceSettingsPage() {
     setWorkspaceName(saved.workspaceName);
     setDefaultDailyCap(saved.defaultDailyCap);
     setDefaultPerTxCap(saved.defaultPerTxCap);
-    setRequire2FA(saved.require2FA);
-    setAutoPauseOnAnomaly(saved.autoPauseOnAnomaly);
-    setRpcEndpoint(saved.rpcEndpoint || rpcUrl);
-    setWebhookUrl(saved.webhookUrl);
   }, []);
 
   async function handleRegisterPasskey() {
@@ -92,7 +81,7 @@ export default function WorkspaceSettingsPage() {
   function handleSave(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
-    saveWorkspaceSettings({ workspaceName, defaultDailyCap, defaultPerTxCap, require2FA, autoPauseOnAnomaly, rpcEndpoint, webhookUrl });
+    saveWorkspaceSettings({ workspaceName, defaultDailyCap, defaultPerTxCap });
     setSaving(false);
     toast.success("Preferences saved", "New vaults will use these caps in this browser.");
   }
@@ -149,18 +138,6 @@ export default function WorkspaceSettingsPage() {
           <Globe size={15} />
           Arc Network RPC
         </button>
-        <button
-          type="button"
-          onClick={() => setActiveTab("webhooks")}
-          className={`flex items-center gap-2 border-b-2 px-4 py-2.5 text-xs font-semibold transition-all ${
-            activeTab === "webhooks"
-              ? "border-accent text-accent"
-              : "border-transparent text-text-muted hover:text-text"
-          }`}
-        >
-          <Bell size={15} />
-          Alert Webhooks
-        </button>
       </div>
 
       {/* Tab Panels */}
@@ -210,8 +187,8 @@ export default function WorkspaceSettingsPage() {
         {activeTab === "security" && (
           <div className="space-y-5">
             <div>
-              <h2 className="text-base font-semibold text-text">Security & Enforcement Automation</h2>
-              <p className="text-xs text-text-muted mt-1">Control contract-level triggers and authentication requirements.</p>
+              <h2 className="text-base font-semibold text-text">Security & sign-in</h2>
+              <p className="text-xs text-text-muted mt-1">Manage passkeys for this workspace. Contract controls remain owner-authorized or server-enforced.</p>
             </div>
 
             <div className="flex flex-col gap-4 rounded-xl border border-line bg-surface-raised p-4 sm:flex-row sm:items-center sm:justify-between">
@@ -320,33 +297,6 @@ export default function WorkspaceSettingsPage() {
               )}
             </div>
 
-            <div className="space-y-4 pt-2 divide-y divide-line">
-              <div className="flex items-center justify-between py-3">
-                <div>
-                  <p className="text-xs font-semibold text-text">Auto-Pause Vault on Anomaly</p>
-                  <p className="text-[11px] text-text-muted">Automatically invoke `pause()` on-chain if 3 consecutive invalid payees are requested.</p>
-                </div>
-                <input
-                  type="checkbox"
-                  checked={autoPauseOnAnomaly}
-                  onChange={(e) => setAutoPauseOnAnomaly(e.target.checked)}
-                  className="h-4 w-4 rounded border-line text-accent focus:ring-accent"
-                />
-              </div>
-
-              <div className="flex items-center justify-between py-3">
-                <div>
-                  <p className="text-xs font-semibold text-text">Require Owner 2FA for Signer Rotation</p>
-                  <p className="text-[11px] text-text-muted">Require hardware key confirmation before issuing on-chain `rotateAgentKey` transactions.</p>
-                </div>
-                <input
-                  type="checkbox"
-                  checked={require2FA}
-                  onChange={(e) => setRequire2FA(e.target.checked)}
-                  className="h-4 w-4 rounded border-line text-accent focus:ring-accent"
-                />
-              </div>
-            </div>
           </div>
         )}
 
@@ -362,33 +312,11 @@ export default function WorkspaceSettingsPage() {
                 <label className="block text-xs font-semibold text-text mb-1.5">Arc Testnet RPC Endpoint</label>
                 <input
                   type="url"
-                  value={rpcEndpoint}
-                  onChange={(e) => setRpcEndpoint(e.target.value)}
+                  value={rpcUrl}
+                  readOnly
                   className="w-full rounded-lg border border-line bg-surface px-4 py-2.5 text-xs text-text focus:border-accent focus:outline-none font-mono"
                 />
-                <p className="mt-1 text-[11px] text-text-muted">Current app default: <span className="font-mono text-text-faint">{rpcUrl}</span>. This field is stored locally for reference.</p>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {activeTab === "webhooks" && (
-          <div className="space-y-5">
-            <div>
-              <h2 className="text-base font-semibold text-text">Alert & Webhook Integration</h2>
-              <p className="text-xs text-text-muted mt-1">Receive real-time HTTP POST webhooks when an agent payment is blocked by a policy rule.</p>
-            </div>
-
-            <div className="space-y-4 pt-2">
-              <div>
-                <label className="block text-xs font-semibold text-text mb-1.5">Alert Webhook Endpoint</label>
-                <input
-                  type="url"
-                  value={webhookUrl}
-                  onChange={(e) => setWebhookUrl(e.target.value)}
-                  className="w-full rounded-lg border border-line bg-surface px-4 py-2.5 text-xs text-text focus:border-accent focus:outline-none font-mono"
-                />
-                <p className="mt-1 text-[11px] text-text-muted">Optional endpoint reference. Webhook delivery is not enabled until a server integration is configured.</p>
+                <p className="mt-1 text-[11px] text-text-muted">This endpoint is supplied by the dashboard environment and is read-only here.</p>
               </div>
             </div>
           </div>
