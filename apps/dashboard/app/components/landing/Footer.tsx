@@ -17,7 +17,7 @@ export function Footer() {
             Factory contract
           </a>
           <Link href="/docs" className="transition-colors hover:text-text">
-            SDK docs
+            Peribolos docs
           </Link>
           <a href={ARC_DOCS_URL} target="_blank" rel="noreferrer" className="transition-colors hover:text-text">
             Arc docs

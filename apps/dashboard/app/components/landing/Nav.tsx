@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { LandingBrand } from "./LandingBrand";
-import { ARC_DOCS_URL } from "@/lib/chain";
 
 export function Nav() {
   return (
@@ -22,14 +21,12 @@ export function Nav() {
           >
             How it works
           </a>
-          <a
-            href={ARC_DOCS_URL}
-            target="_blank"
-            rel="noreferrer"
-            className="hidden text-sm text-text-muted transition-colors hover:text-text sm:inline"
+          <Link
+            href="/docs"
+            className="text-sm font-medium text-text-muted transition-colors hover:text-text"
           >
-            Arc docs
-          </a>
+            Docs
+          </Link>
           <Link
             href="/login"
             className="rounded-lg bg-text px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-accent"

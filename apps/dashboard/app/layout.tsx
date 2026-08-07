@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://peribolos.io"),
+  metadataBase: new URL("https://peribolos.vercel.app"),
   title: {
     default: "Peribolos — Smart Contract Spending Walls for AI Agents on Arc",
     template: "%s | Peribolos",
@@ -23,7 +23,7 @@ export const metadata: Metadata = {
     title: "Peribolos — Smart Contract Spending Walls for AI Agents",
     description:
       "Rule-enforced USDC vaults for AI agents. Prompt injection can fool the model; it cannot cross the wall.",
-    url: "https://peribolos.io",
+    url: "https://peribolos.vercel.app",
     siteName: "Peribolos",
     locale: "en_US",
     type: "website",

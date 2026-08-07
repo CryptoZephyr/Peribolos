@@ -40,6 +40,7 @@ const GROUPS = [
     label: "Developer",
     items: [
       ["API keys", "/app/api-keys", Key],
+      ["Documentation", "/docs", Code],
     ],
   },
 ] as const;
@@ -78,10 +79,6 @@ export function SidebarNav() {
         </div>
       ))}
       <div className="border-t border-line pt-5 space-y-1">
-        <Link href="/docs" className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-[13px] font-medium text-text-muted hover:bg-surface hover:text-text">
-          <Code size={17} />
-          <span>SDK docs</span>
-        </Link>
         <a href={ARC_DOCS_URL} target="_blank" rel="noreferrer" className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-[13px] font-medium text-text-muted hover:bg-surface hover:text-text">
           <Code size={17} />
           <span>Arc docs</span>
