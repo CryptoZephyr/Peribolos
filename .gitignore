@@ -47,6 +47,8 @@ Thumbs.db
 
 # Documentation Directory
 docs/
+!apps/dashboard/app/docs/
+!apps/dashboard/app/docs/**
 
 # Personal Planning & Archive Folders
 archive/

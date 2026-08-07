@@ -39,7 +39,7 @@ export default function SecurityPage() {
         <div className="rounded-xl border border-line bg-surface-raised p-6 space-y-3">
           <h2 className="text-sm font-bold text-text uppercase tracking-wider">Arc Blockchain & Circle USDC Integration</h2>
           <p>
-            Built on <strong>Arc Testnet (Chain ID 5042002)</strong>, where USDC is the native gas token. Vault operations execute with sub-second finality and 6-decimal USDC accounting.
+            Built on <strong>Arc Testnet (Chain ID 5042002)</strong>, where USDC is the native gas token. The product records USDC amounts with 6-decimal accounting; live financial state remains the contract and receipt on Arc.
           </p>
           <div className="pt-2 flex flex-wrap gap-4">
             <Link href="/app/simulations" className="inline-flex items-center gap-1.5 font-semibold text-accent hover:underline">

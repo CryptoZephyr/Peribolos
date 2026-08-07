@@ -2,10 +2,10 @@
   "name": "@peribolos/dashboard",
   "version": "0.1.0",
   "private": true,
-  "description": "Peribolos landing + vault dashboard. Static Next.js export, no backend: the chain is the database.",
+  "description": "Peribolos landing and vault dashboard backed by the protected API and Arc Testnet.",
   "scripts": {
     "dev": "next dev -p 3000",
-    "start": "serve -s out -p 3000",
+    "start": "next start -p 3000",
     "build": "next build",
     "typecheck": "tsc --noEmit"
   },
@@ -15,7 +15,7 @@
     "@supabase/supabase-js": "^2.111.0",
     "@tanstack/react-query": "^5.62.0",
     "geist": "^1.3.1",
-    "next": "16.2.12",
+    "next": "16.3.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "sharp": "0.35.3",

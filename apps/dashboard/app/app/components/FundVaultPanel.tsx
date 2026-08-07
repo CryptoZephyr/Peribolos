@@ -29,6 +29,8 @@ export function FundVaultPanel({
   const [amount, setAmount] = useState("5");
   const [error, setError] = useState<string | null>(null);
   const [recordedHash, setRecordedHash] = useState<string | null>(null);
+  const [isRecorded, setIsRecorded] = useState(false);
+  const [verificationFailed, setVerificationFailed] = useState(false);
   const [txHash, setTxHash] = useState<Hex | null>(null);
   const [isPending, setIsPending] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
@@ -44,8 +46,18 @@ export function FundVaultPanel({
         fromAddress: address,
       }),
     })
-      .then(() => onFunded?.())
-      .catch((err) => console.warn("Fund record failed:", err));
+      .then(() => {
+        setIsRecorded(true);
+        setVerificationFailed(false);
+        onFunded?.();
+      })
+      .catch((err) => {
+        setIsRecorded(false);
+        setVerificationFailed(true);
+        setError(err instanceof Error
+          ? `Transaction mined, but Peribolos could not verify it yet: ${err.message}`
+          : "Transaction mined, but Peribolos could not verify it yet. Refresh after the receipt is indexed.");
+      });
   }, [isSuccess, txHash, recordedHash, vaultId, amount, address, onFunded]);
 
   async function fund() {
@@ -73,6 +85,7 @@ export function FundVaultPanel({
       const hash = await sendNative(vaultAddress, parseEther(amount));
       setTxHash(hash);
       setIsSuccess(true);
+      setIsRecorded(false);
     } catch (err) {
       setError(describeError(err));
     } finally {
@@ -111,6 +124,8 @@ export function FundVaultPanel({
               setTxHash(null);
               setIsSuccess(false);
               setRecordedHash(null);
+              setIsRecorded(false);
+              setVerificationFailed(false);
             }}
             className="w-full rounded-md border border-line bg-surface-raised px-3 py-2 text-xs font-mono"
           />
@@ -128,6 +143,19 @@ export function FundVaultPanel({
         </button>
       </div>
       {error && <p className="text-[11px] text-rose-400">{error}</p>}
+      {verificationFailed && txHash && (
+        <button
+          type="button"
+          onClick={() => {
+            setError(null);
+            setVerificationFailed(false);
+            setRecordedHash(null);
+          }}
+          className="text-[11px] font-semibold text-accent hover:underline"
+        >
+          Retry receipt verification
+        </button>
+      )}
       {txHash && (
         <a
           href={txUrl(txHash as Hex)}
@@ -135,7 +163,7 @@ export function FundVaultPanel({
           rel="noreferrer"
           className="text-[11px] text-accent hover:underline font-mono"
         >
-          {isSuccess ? "Funded — view tx" : "Tx submitted"} ↗
+          {isRecorded ? "Fund verified — view tx" : isSuccess ? "Tx mined — verification pending" : "Tx submitted"} ↗
         </a>
       )}
     </div>

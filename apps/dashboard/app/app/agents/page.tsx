@@ -423,20 +423,22 @@ export default function AgentsPage() {
                         ? "♻ Re-provision DCW"
                         : "🔄 Rotate Signer"}
                   </button>
-                  <button
-                    onClick={() =>
-                      vault && promptPauseVault(vault.id, vault.paused, agent.name)
-                    }
-                    disabled={!vault}
-                    title={!vault ? "Create or link a vault before changing pause state." : undefined}
-                    className={`flex-1 rounded-md px-3 py-2 text-xs font-semibold text-white transition-opacity ${
-                      vault?.paused
-                        ? "bg-emerald-600 hover:bg-emerald-500"
-                        : "bg-rose-600 hover:bg-rose-500"
-                    } disabled:cursor-not-allowed disabled:bg-surface-overlay disabled:text-text-faint disabled:hover:bg-surface-overlay`}
-                  >
-                    {vault ? (vault.paused ? "▶ Unpause Vault" : "⏸ Pause Vault") : "Vault required"}
-                  </button>
+                  {vault?.mode === "live" ? (
+                    <a href="/app/vaults" className="flex-1 rounded-md border border-line bg-surface px-3 py-2 text-center text-xs font-semibold text-text hover:border-accent hover:text-accent">
+                      Owner controls
+                    </a>
+                  ) : (
+                    <button
+                      onClick={() => vault && promptPauseVault(vault.id, vault.paused, agent.name)}
+                      disabled={!vault}
+                      title={!vault ? "Create or link a vault before changing pause state." : undefined}
+                      className={`flex-1 rounded-md px-3 py-2 text-xs font-semibold text-white transition-opacity ${
+                        vault?.paused ? "bg-emerald-600 hover:bg-emerald-500" : "bg-rose-600 hover:bg-rose-500"
+                      } disabled:cursor-not-allowed disabled:bg-surface-overlay disabled:text-text-faint disabled:hover:bg-surface-overlay`}
+                    >
+                      {vault ? (vault.paused ? "Resume preflight" : "Pause preflight") : "Vault required"}
+                    </button>
+                  )}
                 </div>
               </div>
             );

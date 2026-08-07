@@ -11,6 +11,7 @@ import { db } from './db/store.js';
 dotenv.config({ path: fileURLToPath(new URL('../.env', import.meta.url)) });
 
 const app = express();
+app.disable('x-powered-by');
 const PORT = process.env.PORT || 3400;
 
 // CORS: restrict browser access to explicitly trusted origins in production.
@@ -40,6 +41,13 @@ app.use(cors({
 }));
 
 app.use(express.json({ limit: '1mb' }));
+app.use((_req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+  next();
+});
 
 // Rate Limiter: max 200 requests per 1-minute window
 const limiter = rateLimit({
@@ -91,7 +99,11 @@ app.get('/ready', (_req, res) => {
       circleConfigured: signer.circle.configured,
       localFallbackEnabled: signer.localFallbackEnabled,
     },
-    persistence,
+    persistence: {
+      provider: persistence.provider,
+      configured: persistence.configured,
+      healthy: persistence.healthy,
+    },
   });
 });
 
@@ -112,12 +124,14 @@ function validateProductionConfiguration(): void {
   )) {
     missing.push('SUPABASE_URL and SUPABASE_ANON_KEY');
   }
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY?.trim()) missing.push('SUPABASE_SERVICE_ROLE_KEY');
   if (!process.env.CORS_ORIGIN?.trim()) missing.push('CORS_ORIGIN');
   if (missing.length > 0) {
     throw new Error(`Production configuration is incomplete: ${missing.join('; ')}`);
   }
-  if (db.getPersistenceStatus().provider !== 'supabase' || !process.env.SUPABASE_SERVICE_ROLE_KEY?.trim()) {
-    console.warn('[API] SUPABASE_SERVICE_ROLE_KEY is not set; production readiness will remain unavailable.');
+  const persistence = db.getPersistenceStatus();
+  if (persistence.provider !== 'supabase' || !persistence.configured || !persistence.healthy) {
+    throw new Error('Production persistence is not healthy; refusing to start the API.');
   }
 }
 

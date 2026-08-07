@@ -203,12 +203,13 @@ class DatabaseStore {
     const wantsRemote = process.env.NODE_ENV === 'production' || process.env.PERIBOLOS_USE_SUPABASE === '1';
 
     if (!wantsRemote) {
-      return new DatabaseStore(DatabaseStore.loadFile(), null, false);
+      const store = new DatabaseStore(DatabaseStore.loadFile(), null, false);
+      await store.flushPersistence();
+      return store;
     }
 
     if (!supabaseUrl || !serviceRoleKey) {
-      console.error('[DB] Supabase persistence is not configured. Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY.');
-      return new DatabaseStore(emptyDbSchema(), null, false, false, 'SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required.');
+      throw new Error('Supabase persistence is not configured. Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY before starting the API.');
     }
 
     const client = createClient(supabaseUrl, serviceRoleKey, {
@@ -221,11 +222,13 @@ class DatabaseStore {
         .eq('id', SUPABASE_STATE_ID)
         .maybeSingle();
       if (error) throw error;
-      return new DatabaseStore((data?.data as DbSchema | null) || emptyDbSchema(), client, true);
+      const store = new DatabaseStore((data?.data as DbSchema | null) || emptyDbSchema(), client, true);
+      await store.flushPersistence();
+      return store;
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       console.error(`[DB] Supabase state load failed: ${message}`);
-      return new DatabaseStore(emptyDbSchema(), client, true, false, message.slice(0, 300));
+      throw new Error(`Supabase state load failed; refusing to start with an empty store: ${message.slice(0, 300)}`);
     }
   }
 
@@ -345,7 +348,11 @@ class DatabaseStore {
     if (this.remotePersistence && this.supabase) {
       const client = this.supabase;
       const snapshot = JSON.parse(JSON.stringify(this.data)) as DbSchema;
-      this.remoteSaveQueue = this.remoteSaveQueue
+      // A later full-state snapshot can recover from an earlier failed write.
+      // Keep the active operation rejected, however, so flushPersistence can
+      // prevent an API response from acknowledging state that is not durable.
+      const operation = this.remoteSaveQueue
+        .catch(() => undefined)
         .then(async () => {
           const { error } = await client
             .from(SUPABASE_STATE_TABLE)
@@ -362,11 +369,18 @@ class DatabaseStore {
           this.persistenceHealthy = false;
           this.persistenceError = (error instanceof Error ? error.message : String(error)).slice(0, 300);
           console.error(`[DB] Supabase state save failed: ${this.persistenceError}`);
+          throw error;
         });
+      this.remoteSaveQueue = operation;
+      // The response persistence barrier attaches its own await. This handler
+      // only prevents Node from treating the short gap as an unhandled rejection.
+      void operation.catch(() => undefined);
       return;
     }
 
-    if (process.env.NODE_ENV === 'production') return;
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error('Production persistence is unavailable; refusing to discard state.');
+    }
     try {
       const dir = path.dirname(DB_FILE);
       if (!fs.existsSync(dir)) {
@@ -374,7 +388,18 @@ class DatabaseStore {
       }
       fs.writeFileSync(DB_FILE, JSON.stringify(this.data, null, 2), 'utf-8');
     } catch (err) {
-      console.error('[DB] Save error:', err);
+      this.persistenceHealthy = false;
+      this.persistenceError = (err instanceof Error ? err.message : String(err)).slice(0, 300);
+      console.error('[DB] Save error:', this.persistenceError);
+      throw err;
+    }
+  }
+
+  /** Wait until every state snapshot queued so far has reached durable storage. */
+  public async flushPersistence(): Promise<void> {
+    await this.remoteSaveQueue;
+    if (!this.persistenceHealthy) {
+      throw new Error(this.persistenceError || 'Persistence is unavailable.');
     }
   }
 
@@ -395,7 +420,12 @@ class DatabaseStore {
         lastError: this.persistenceError,
       };
     }
-    return { provider: 'file', configured: true, healthy: true };
+    return {
+      provider: 'file',
+      configured: true,
+      healthy: this.persistenceHealthy,
+      lastError: this.persistenceError,
+    };
   }
 
   public getOrCreateExternalWorkspace(externalAuthId: string, email: string): string {
@@ -593,6 +623,9 @@ class DatabaseStore {
 
   // Getters & Setters
   public getWorkspaces() { return this.data.workspaces; }
+  public getUserByExternalAuthId(externalAuthId: string) {
+    return this.data.users.find(user => user.externalAuthId === externalAuthId);
+  }
   public getAgents(wsId?: string) {
     return wsId ? this.data.agents.filter(a => a.workspaceId === wsId) : this.data.agents;
   }
@@ -691,6 +724,10 @@ class DatabaseStore {
   public getApiKeyByHash(hash: string) {
     return this.data.apiKeys.find(k => k.keyHash === hash && k.status === 'active');
   }
+  public getPendingManagedSigner(vaultId: string, agentId: string) {
+    return this.data.managedSigners.find(s => s.vaultId === vaultId && s.agentId === agentId && s.status === 'pending');
+  }
+
   public revokeApiKey(workspaceId: string, keyId: string): ApiKeyRecord | undefined {
     const key = this.data.apiKeys.find(k => k.id === keyId && k.workspaceId === workspaceId);
     if (!key) return undefined;
@@ -726,8 +763,11 @@ class DatabaseStore {
     return this.data.paymentRequests.find(pr => pr.workspaceId === wsId && pr.idempotencyKey === idempotencyKey);
   }
   public addChainEvent(evt: ChainEventRecord) {
-    // Avoid duplicate event insertions by stable event id.
-    const exists = this.data.chainEvents.some(e => e.id === evt.id);
+    // Avoid duplicate event insertions by stable id or transaction/vault pair.
+    const exists = this.data.chainEvents.some(e =>
+      e.id === evt.id ||
+      (e.vaultAddress.toLowerCase() === evt.vaultAddress.toLowerCase() && e.txHash.toLowerCase() === evt.txHash.toLowerCase())
+    );
     if (!exists) {
       this.data.chainEvents.unshift(evt);
       this.save();

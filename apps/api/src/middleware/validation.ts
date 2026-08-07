@@ -28,28 +28,28 @@ export const paymentSchema = z.object({
     message: 'amountUsdc must use no more than 6 decimal places (USDC precision).'
   }),
   actionType: z.number().int().min(0).max(255).optional().default(1),
-  idempotencyKey: z.string().min(1).optional(),
+  idempotencyKey: z.string().min(1).max(200).optional(),
   metadataHash: z.string().regex(txHashRegex, {
     message: 'metadataHash must be a 32-byte 0x-prefixed hex string.'
   }).optional()
 });
 
 export const createAgentSchema = z.object({
-  name: z.string().min(1, 'Agent name is required'),
-  description: z.string().optional().default('AI agent managed by Peribolos'),
+  name: z.string().min(1, 'Agent name is required').max(120, 'Agent name is too long'),
+  description: z.string().max(500, 'Agent description is too long').optional().default('AI agent managed by Peribolos'),
   framework: z.enum(['langchain', 'openai-agents-sdk', 'crewai', 'custom']).optional().default('langchain'),
-  workspaceId: z.string().optional().default('ws_default'),
+  workspaceId: z.string().max(120).optional().default('ws_default'),
   vaultAddress: z.string().regex(ethereumAddressRegex).optional(),
   ownerAddress: z.string().regex(ethereumAddressRegex).optional()
 });
 
 export const createPayeeSchema = z.object({
-  name: z.string().min(1, 'Payee name is required'),
+  name: z.string().min(1, 'Payee name is required').max(120, 'Payee name is too long'),
   address: z.string().regex(ethereumAddressRegex, {
     message: 'address must be a valid 0x-prefixed hex address'
   }),
   category: z.enum(['api', 'data', 'compute', 'service', 'other']).optional().default('api'),
-  description: z.string().optional().default(''),
+  description: z.string().max(500, 'Payee description is too long').optional().default(''),
   allowedActionType: z.number().int().min(0).max(255).optional().default(1),
   defaultLimitUsdc: z.number().positive().optional().default(10.0),
   workspaceId: z.string().optional().default('ws_default')
@@ -74,6 +74,37 @@ export const fundVaultSchema = z.object({
     message: 'txHash must be a real 32-byte transaction hash'
   }),
   fromAddress: z.string().regex(ethereumAddressRegex).optional()
+});
+
+export const createApiKeySchema = z.object({
+  agentId: z.string().min(1).max(120).optional(),
+  name: z.string().trim().min(1).max(120).optional().default('Agent API Key'),
+  role: z.enum(['operator', 'agent']).optional().default('agent')
+});
+
+export const signerTargetSchema = z.object({
+  vaultId: z.string().min(1).max(120),
+  agentId: z.string().min(1).max(120)
+});
+
+export const signerConfirmSchema = signerTargetSchema.extend({
+  newSignerAddress: z.string().regex(ethereumAddressRegex),
+  txHash: z.string().regex(txHashRegex)
+});
+
+export const signerPauseSchema = z.object({
+  vaultId: z.string().min(1).max(120),
+  paused: z.boolean()
+});
+
+export const signerRevokeSchema = z.object({
+  agentId: z.string().min(1).max(120),
+  vaultId: z.string().min(1).max(120)
+});
+
+export const promptInjectionSchema = z.object({
+  scenarioId: z.string().min(1).max(120).optional(),
+  vaultId: z.string().min(1).max(120).optional()
 });
 
 export function validateBody(schema: z.ZodSchema) {

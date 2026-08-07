@@ -9,7 +9,7 @@
  *
  * Key-handling note: the agent key is generated CLIENT-SIDE and shown once for
  * the owner to copy into their agent's env. Peribolos never transmits or stores
- * it — consistent with "no backend, no key custody". The owner may also paste
+ * it — consistent with the direct-contract mode's client-side key boundary. The owner may also paste
  * an address they already control.
  */
 

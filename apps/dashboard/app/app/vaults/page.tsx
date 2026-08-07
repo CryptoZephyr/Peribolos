@@ -36,6 +36,8 @@ type ChainState = {
   epochSpentUsdc: string;
   perTxCapUsdc: string;
   dailyCapUsdc: string;
+  floatAmountUsdc: string;
+  allowedActionsBitmap: string;
   explorerUrl: string;
 };
 
@@ -100,11 +102,12 @@ export default function VaultsPage() {
   }
 
   function startEdit(vault: Vault) {
+    if (vault.mode === "live") return;
     setEditingId(vault.id);
     setDailyCap(String(vault.dailyCapUsdc));
     setPerTxCap(String(vault.perTxCapUsdc));
     setAllowedBitmap(String(vault.allowedActionsBitmap));
-    setLiveAddress(vault.mode === "live" ? vault.address : "");
+    setLiveAddress("");
   }
 
   async function saveRules(vaultId: string) {
@@ -123,8 +126,8 @@ export default function VaultsPage() {
         method: "PATCH",
         body: JSON.stringify(body),
       });
-      toast.success("Spending Rules Updated", "Vault daily & per-tx limits saved.");
-      setSuccessMessage("Spending rules saved. The workspace now reflects the updated policy.");
+      toast.success(liveAddress ? "Live Vault Attached" : "Offline Rules Updated", liveAddress ? "Authoritative rules were read from Arc." : "Offline preflight limits were saved.");
+      setSuccessMessage(liveAddress ? "Vault attached and synchronized from Arc Testnet." : "Offline preflight rules saved.");
       setEditingId(null);
       await loadVaults();
     } catch (err: unknown) {
@@ -279,6 +282,9 @@ export default function VaultsPage() {
             (() => {
               const chainState = chainStates[vault.id];
               const paused = chainState?.paused ?? vault.paused;
+              const shownDailyCap = chainState ? Number(chainState.dailyCapUsdc) : vault.dailyCapUsdc;
+              const shownPerTxCap = chainState ? Number(chainState.perTxCapUsdc) : vault.perTxCapUsdc;
+              const shownActions = chainState ? BigInt(chainState.allowedActionsBitmap) : BigInt(vault.allowedActionsBitmap);
               const pauseStateDiverges = Boolean(chainState && chainState.paused !== vault.paused);
               return (
             <div
@@ -318,36 +324,43 @@ export default function VaultsPage() {
                   )}
                 </div>
                 <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => togglePause(vault)}
-                    className={`rounded-md px-3 py-1.5 text-xs font-semibold text-white transition-opacity ${
-                      paused ? "bg-emerald-600 hover:bg-emerald-500" : "bg-rose-600 hover:bg-rose-500"
-                    }`}
-                  >
-                    {paused ? "Unpause Vault" : "Pause Vault"}
-                  </button>
-                  <button
-                    onClick={() => startEdit(vault)}
-                    className="rounded-md border border-line bg-surface px-3 py-1.5 text-xs font-semibold text-text hover:bg-surface-raised transition-colors"
-                  >
-                    Edit Rules
-                  </button>
+                  {vault.mode === "offline" && (
+                    <>
+                      <button
+                        onClick={() => togglePause(vault)}
+                        className={`rounded-md px-3 py-1.5 text-xs font-semibold text-white transition-opacity ${
+                          paused ? "bg-emerald-600 hover:bg-emerald-500" : "bg-rose-600 hover:bg-rose-500"
+                        }`}
+                      >
+                        {paused ? "Resume preflight" : "Pause preflight"}
+                      </button>
+                      <button
+                        onClick={() => startEdit(vault)}
+                        className="rounded-md border border-line bg-surface px-3 py-1.5 text-xs font-semibold text-text hover:bg-surface-raised transition-colors"
+                      >
+                        Edit offline rules
+                      </button>
+                    </>
+                  )}
+                  {vault.mode === "live" && <span className="text-[11px] text-text-faint">Owner actions are below</span>}
                 </div>
               </div>
 
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                 <div className="rounded-lg border border-line bg-surface p-4">
                   <span className="text-xs text-text-muted">Daily Budget Cap</span>
-                  <p className="mt-1 text-lg font-bold text-text font-mono">${vault.dailyCapUsdc.toFixed(2)} USDC</p>
+                  <p className="mt-1 text-lg font-bold text-text font-mono">${shownDailyCap.toFixed(2)} USDC</p>
+                  {vault.mode === "live" && <span className="text-[10px] text-text-faint">Read from Arc</span>}
                 </div>
                 <div className="rounded-lg border border-line bg-surface p-4">
                   <span className="text-xs text-text-muted">Per-Transaction Cap</span>
-                  <p className="mt-1 text-lg font-bold text-text font-mono">${vault.perTxCapUsdc.toFixed(2)} USDC</p>
+                  <p className="mt-1 text-lg font-bold text-text font-mono">${shownPerTxCap.toFixed(2)} USDC</p>
+                  {vault.mode === "live" && <span className="text-[10px] text-text-faint">Read from Arc</span>}
                 </div>
                 <div className="rounded-lg border border-line bg-surface p-4">
                   <span className="text-xs text-text-muted">Allowed Action Bitmap</span>
                   <p className="mt-1 text-lg font-bold text-accent font-mono">
-                    0b{vault.allowedActionsBitmap.toString(2)} ({vault.allowedActionsBitmap})
+                    0b{shownActions.toString(2)} ({shownActions.toString()})
                   </p>
                 </div>
                 {vault.mode === "live" && (
@@ -450,12 +463,17 @@ export default function VaultsPage() {
                 onFunded={loadVaults}
               />
 
-              {vault.mode === "live" && vault.ownerAddress && (
+              {vault.mode === "live" && chainState && (
                 <OwnerControls
+                  vaultId={vault.id}
                   vaultAddress={vault.address as Address}
-                  owner={vault.ownerAddress as Address}
+                  owner={chainState.ownerAddress as Address}
                   paused={paused}
-                  balance={chainState ? BigInt(chainState.balanceUsdcUnits) : 0n}
+                  balance={BigInt(chainState.balanceUsdcUnits)}
+                  perTxCap={BigInt(Math.round(Number(chainState.perTxCapUsdc) * 1_000_000))}
+                  dailyCap={BigInt(Math.round(Number(chainState.dailyCapUsdc) * 1_000_000))}
+                  floatAmount={BigInt(Math.round(Number(chainState.floatAmountUsdc) * 1_000_000))}
+                  allowedActions={BigInt(chainState.allowedActionsBitmap)}
                   onSettled={loadVaults}
                 />
               )}

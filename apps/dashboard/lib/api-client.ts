@@ -1,10 +1,8 @@
 import { supabase } from './supabase';
 
 export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || (process.env.NODE_ENV === 'development' ? 'http://localhost:3400' : '');
-const CONFIGURED_API_KEY = process.env.NEXT_PUBLIC_PERIBOLOS_API_KEY;
 
 function resolveApiKey(): string | undefined {
-  if (CONFIGURED_API_KEY) return CONFIGURED_API_KEY;
   if (typeof window === 'undefined') return undefined;
   return window.localStorage.getItem('peribolos.apiKey.v1') || undefined;
 }

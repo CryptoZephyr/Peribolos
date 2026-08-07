@@ -1,0 +1,14 @@
+import type { Metadata } from "next";
+import { DocPage, Section, Callout } from "../_components/DocPage";
+
+export const metadata: Metadata = { title: "Security model" };
+const toc = [{ id: "boundary", label: "Trust boundary" }, { id: "credentials", label: "Credentials" }, { id: "persistence", label: "Persistence" }, { id: "operations", label: "Operational checklist" }];
+
+export default function SecurityDocsPage() {
+  return <DocPage eyebrow="Operate" title="Security model" description="Peribolos minimizes agent authority, keeps owner powers in the browser wallet, and fails closed when durable state or chain proof is unavailable." toc={toc}>
+    <Section id="boundary" title="Trust boundary"><div className="grid gap-4 sm:grid-cols-2"><Callout tone="success" title="Enforced on Arc">Recipient allowlist, action bitmap, caps, expiry, pause, signer authorization, balance, withdrawals, and treasury behavior.</Callout><Callout title="Enforced by the hosted service">Workspace access, API-key scope, idempotency records, signer provider access, audit indexing, and offline preflight.</Callout></div><p>Hosted checks improve usability and reduce failed transactions, but the vault contract remains the final spending authority.</p></Section>
+    <Section id="credentials" title="Credentials"><ul className="list-disc space-y-2 pl-5"><li>Agent API keys are hashed at rest and scoped to one agent. Raw keys are returned once.</li><li>Circle Developer-Controlled Wallet credentials remain server-side; they are never delivered to the dashboard or model process.</li><li>Owner actions require a connected browser wallet whose address matches the contract owner.</li><li>Operator endpoints require an owner/admin user session or an operator-role API key.</li></ul></Section>
+    <Section id="persistence" title="Durable persistence"><p>Production startup requires Supabase state storage. Every API JSON response waits for queued state snapshots to finish. If persistence cannot confirm the current snapshot, the API returns <code className="font-mono text-text">503 PERSISTENCE_UNAVAILABLE</code> instead of acknowledging a one-time key, payment record, or configuration change that may be lost.</p></Section>
+    <Section id="operations" title="Operational checklist"><ol className="list-decimal space-y-2 pl-5"><li>Restrict CORS to the deployed dashboard origin.</li><li>Store Circle, Supabase service-role, bootstrap, and signer-encryption values only in the host secret manager.</li><li>Use a long unique bootstrap key once, then issue narrower agent keys.</li><li>Monitor <code className="font-mono text-text">/ready</code>; remove unhealthy instances from traffic.</li><li>When revoking a live signer during an incident, also pause or rotate on-chain from the owner wallet.</li></ol></Section>
+  </DocPage>;
+}

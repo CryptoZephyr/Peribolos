@@ -434,6 +434,54 @@ describe('Peribolos V2 API Integration Tests', () => {
     assert.ok(!('privateKey' in rotated));
   });
 
+  it('POST /v1/agents rejects one-step live attachment before agent publication', async () => {
+    const before = db.getAgents('ws_default').length;
+    const res = await fetch(`${baseUrl}/v1/agents`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${DEMO_KEY}` },
+      body: JSON.stringify({
+        name: 'Unsafe One Step Agent',
+        framework: 'custom',
+        vaultAddress: '0x2222222222222222222222222222222222222222'
+      })
+    });
+    assert.strictEqual(res.status, 409);
+    const body = await res.json();
+    assert.strictEqual(body.error, 'LIVE_VAULT_REQUIRES_TWO_PHASE_SETUP');
+    assert.strictEqual(db.getAgents('ws_default').length, before);
+  });
+
+  it('signer pause and revoke require explicit vault targets and pause state', async () => {
+    const pauseRes = await fetch(`${baseUrl}/v1/signers/pause`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${DEMO_KEY}` },
+      body: '{}'
+    });
+    assert.strictEqual(pauseRes.status, 400);
+
+    const revokeRes = await fetch(`${baseUrl}/v1/signers/revoke`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${DEMO_KEY}` },
+      body: JSON.stringify({ agentId: 'ag_demo' })
+    });
+    assert.strictEqual(revokeRes.status, 400);
+  });
+
+  it('API responses fail closed when the persistence barrier cannot confirm state', async () => {
+    const originalFlush = db.flushPersistence.bind(db);
+    db.flushPersistence = async () => { throw new Error('simulated storage outage'); };
+    try {
+      const res = await fetch(`${baseUrl}/v1/workspaces`, {
+        headers: { Authorization: `Bearer ${DEMO_KEY}` }
+      });
+      assert.strictEqual(res.status, 503);
+      const body = await res.json();
+      assert.strictEqual(body.error, 'PERSISTENCE_UNAVAILABLE');
+    } finally {
+      db.flushPersistence = originalFlush;
+    }
+  });
+
   it('agent payment keys cannot perform workspace-management actions', async () => {
     const createRes = await fetch(`${baseUrl}/v1/agents`, {
       method: 'POST',
@@ -487,6 +535,22 @@ describe('Peribolos V2 API Integration Tests', () => {
     assert.strictEqual(prepared.status, 'pending_owner_confirmation');
     assert.ok(prepared.newSignerAddress?.startsWith('0x'));
 
+    const duplicatePrepareRes = await fetch(`${baseUrl}/v1/signers/rotate/prepare`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${DEMO_KEY}` },
+      body: JSON.stringify({ vaultId: created.vault.id, agentId: created.agent.id })
+    });
+    assert.strictEqual(duplicatePrepareRes.status, 409);
+    const duplicateBody = await duplicatePrepareRes.json();
+    assert.strictEqual(duplicateBody.error, 'PENDING_SIGNER_ALREADY_EXISTS');
+
+    const confirmWithoutProof = await fetch(`${baseUrl}/v1/signers/rotate/confirm`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${DEMO_KEY}` },
+      body: JSON.stringify({ vaultId: created.vault.id, agentId: created.agent.id, newSignerAddress: prepared.newSignerAddress })
+    });
+    assert.strictEqual(confirmWithoutProof.status, 400);
+
     const rotateRes = await fetch(`${baseUrl}/v1/signers/rotate`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${DEMO_KEY}` },
@@ -495,6 +559,26 @@ describe('Peribolos V2 API Integration Tests', () => {
     assert.strictEqual(rotateRes.status, 409);
     const body = await rotateRes.json();
     assert.strictEqual(body.error, 'LIVE_VAULT_ROTATION_REQUIRES_OWNER');
+
+    const rulePatchRes = await fetch(`${baseUrl}/v1/vaults/${created.vault.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${DEMO_KEY}` },
+      body: JSON.stringify({ dailyCapUsdc: 1, perTxCapUsdc: 1 })
+    });
+    assert.strictEqual(rulePatchRes.status, 409);
+    const rulePatchBody = await rulePatchRes.json();
+    assert.strictEqual(rulePatchBody.error, 'LIVE_VAULT_OWNER_ACTION_REQUIRED');
+
+    const revokeRes = await fetch(`${baseUrl}/v1/signers/revoke`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${DEMO_KEY}` },
+      body: JSON.stringify({ vaultId: created.vault.id, agentId: created.agent.id })
+    });
+    assert.strictEqual(revokeRes.status, 200);
+    const revoked = await revokeRes.json();
+    assert.strictEqual(revoked.ownerActionRequired, true);
+    assert.strictEqual(revoked.onChainAgentKeyStillAuthorized, true);
+    assert.strictEqual(db.getVaultById(created.vault.id)?.paused, false);
     db.updateVault(created.vault.id, { mode: 'offline' });
   });
 

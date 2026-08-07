@@ -2,7 +2,7 @@ import crypto from 'node:crypto';
 import dotenv from 'dotenv';
 import { fileURLToPath } from 'node:url';
 import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts';
-import { createWalletClient, http, createPublicClient, parseAbi, keccak256, toBytes, formatUnits } from 'viem';
+import { createWalletClient, http, createPublicClient, parseAbi, keccak256, toBytes, formatUnits, formatEther, parseEther } from 'viem';
 import { arcTestnet } from '@peribolos/core';
 import { db, ManagedSignerRecord } from '../db/store.js';
 import {
@@ -57,6 +57,8 @@ export const PERIBOLOS_VAULT_ABI = parseAbi([
   'function owner() external view returns (address)',
   'function dailyCap() external view returns (uint128)',
   'function perTxCap() external view returns (uint128)',
+  'function floatAmount() external view returns (uint128)',
+  'function allowedActions() external view returns (uint256)',
   'function epochSpent() external view returns (uint128)',
   'function allowedActions() external view returns (uint256)',
   'function agentExpiry() external view returns (uint64)',
@@ -64,7 +66,8 @@ export const PERIBOLOS_VAULT_ABI = parseAbi([
   'function paused() external view returns (bool)',
   'function allowlist(address target) external view returns (bool)',
   'event PaymentExecuted(address indexed to, uint256 amount, uint8 indexed actionType, uint256 epochSpent)',
-  'event PaymentBlocked(address indexed to, uint256 amount, uint8 indexed actionType, uint8 indexed reason)'
+  'event PaymentBlocked(address indexed to, uint256 amount, uint8 indexed actionType, uint8 indexed reason)',
+  'event AgentKeyRotated(address indexed newAgentKey, uint64 newExpiry)'
 ]);
 
 const PAYMENT_EXECUTED_TOPIC = keccak256(
@@ -72,6 +75,9 @@ const PAYMENT_EXECUTED_TOPIC = keccak256(
 );
 const PAYMENT_BLOCKED_TOPIC = keccak256(
   toBytes('PaymentBlocked(address,uint256,uint8,uint8)')
+);
+const AGENT_KEY_ROTATED_TOPIC = keccak256(
+  toBytes('AgentKeyRotated(address,uint64)')
 );
 
 const ERC20_BALANCE_ABI = parseAbi([
@@ -107,6 +113,11 @@ export type SignerReadiness = {
 function readTrimmedEnv(name: string): string | undefined {
   const value = process.env[name]?.trim();
   return value || undefined;
+}
+
+function safeChainError(error: unknown, fallback: string): string {
+  if (process.env.NODE_ENV === 'production') return fallback;
+  return error instanceof Error ? error.message.slice(0, 300) : fallback;
 }
 
 export class ManagedSignerService {
@@ -204,8 +215,124 @@ export class ManagedSignerService {
       return {
         valid: false,
         reasonCode: 'VAULT_READ_FAILED',
-        reasonDescription: err instanceof Error ? err.message.slice(0, 300) : 'Unable to read the vault on Arc Testnet.'
+        reasonDescription: safeChainError(err, 'Unable to read the vault on Arc Testnet.')
       };
+    }
+  }
+
+  /** Verify that a submitted hash is a mined successful transaction. */
+  /** Verify that a successful owner transaction rotated this exact vault to this exact signer. */
+  public async verifyAgentKeyRotationTransaction(params: {
+    txHash: `0x${string}`;
+    vaultAddress: `0x${string}`;
+    newSignerAddress: `0x${string}`;
+  }): Promise<{
+    valid: boolean;
+    blockNumber: number;
+    retryable?: boolean;
+    reasonCode?: string;
+    reasonDescription?: string;
+  }> {
+    const invalid = (reasonCode: string, reasonDescription: string, retryable = false, blockNumber = 0) => ({
+      valid: false as const,
+      blockNumber,
+      retryable,
+      reasonCode,
+      reasonDescription,
+    });
+    try {
+      const [receipt, transaction] = await Promise.all([
+        this.publicClient.getTransactionReceipt({ hash: params.txHash }),
+        this.publicClient.getTransaction({ hash: params.txHash }),
+      ]);
+      const blockNumber = Number(receipt.blockNumber);
+      if (receipt.status !== 'success') {
+        return invalid('ROTATION_TRANSACTION_REVERTED', 'The signer rotation transaction was mined but reverted.', false, blockNumber);
+      }
+      if (!transaction.to || transaction.to.toLowerCase() !== params.vaultAddress.toLowerCase()) {
+        return invalid('ROTATION_VAULT_MISMATCH', 'The submitted transaction did not target this Peribolos vault.', false, blockNumber);
+      }
+      const signerTopic = `0x${params.newSignerAddress.slice(2).toLowerCase().padStart(64, '0')}`;
+      const eventFound = receipt.logs.some((log) =>
+        log.address.toLowerCase() === params.vaultAddress.toLowerCase()
+        && log.topics[0]?.toLowerCase() === AGENT_KEY_ROTATED_TOPIC.toLowerCase()
+        && log.topics[1]?.toLowerCase() === signerTopic
+      );
+      if (!eventFound) {
+        return invalid('ROTATION_EVENT_MISSING', 'The transaction did not emit AgentKeyRotated for the pending signer.', false, blockNumber);
+      }
+      return { valid: true, blockNumber };
+    } catch (err: unknown) {
+      return invalid(
+        'ROTATION_TRANSACTION_UNAVAILABLE',
+        safeChainError(err, 'Unable to read the signer rotation transaction from Arc Testnet.'),
+        true
+      );
+    }
+  }
+
+  /** Verify the destination, sender, value, and receipt for native Arc USDC funding. */
+  public async verifyNativeFundingTransaction(params: {
+    vaultAddress: `0x${string}`;
+    txHash: `0x${string}`;
+    expectedAmountUsdc: number;
+    expectedFromAddress?: `0x${string}`;
+  }): Promise<{
+    valid: boolean;
+    amountUsdc: number;
+    fromAddress: `0x${string}`;
+    blockNumber: number;
+    retryable?: boolean;
+    reasonCode?: string;
+    reasonDescription?: string;
+  }> {
+    const invalid = (reasonCode: string, reasonDescription: string, retryable = false) => ({
+      valid: false as const,
+      amountUsdc: 0,
+      fromAddress: '0x0000000000000000000000000000000000000000' as `0x${string}`,
+      blockNumber: 0,
+      retryable,
+      reasonCode,
+      reasonDescription,
+    });
+
+    try {
+      const [receipt, transaction] = await Promise.all([
+        this.publicClient.getTransactionReceipt({ hash: params.txHash }),
+        this.publicClient.getTransaction({ hash: params.txHash }),
+      ]);
+      if (receipt.status !== 'success') {
+        return invalid('FUND_TRANSACTION_REVERTED', 'The funding transaction was mined but reverted on Arc Testnet.');
+      }
+      if (!transaction.to || transaction.to.toLowerCase() !== params.vaultAddress.toLowerCase()) {
+        return invalid('FUND_RECIPIENT_MISMATCH', 'The submitted transaction did not send native USDC to this vault.');
+      }
+      if (transaction.value <= 0n) {
+        return invalid('FUND_AMOUNT_ZERO', 'The submitted transaction transferred no native USDC.');
+      }
+      if (params.expectedFromAddress && transaction.from.toLowerCase() !== params.expectedFromAddress.toLowerCase()) {
+        return invalid('FUND_SENDER_MISMATCH', 'The submitted transaction sender does not match the connected wallet.');
+      }
+      const expectedValue = parseEther(String(params.expectedAmountUsdc));
+      if (transaction.value !== expectedValue) {
+        return invalid('FUND_AMOUNT_MISMATCH', 'The submitted transaction amount does not match the requested funding amount.');
+      }
+      const amountUsdc = Number(formatEther(transaction.value));
+      if (!Number.isFinite(amountUsdc)) {
+        return invalid('FUND_AMOUNT_INVALID', 'The submitted transaction amount is outside the supported range.');
+      }
+      return {
+        valid: true,
+        amountUsdc,
+        fromAddress: transaction.from,
+        blockNumber: Number(receipt.blockNumber),
+      };
+    } catch (err: unknown) {
+      return invalid(
+        'FUND_TRANSACTION_UNAVAILABLE',
+        safeChainError(err, 'Unable to read the funding transaction from Arc Testnet.'),
+        true
+      );
     }
   }
 
@@ -238,9 +365,11 @@ export class ManagedSignerService {
     paused: boolean;
     perTxCapUsdcUnits: bigint;
     dailyCapUsdcUnits: bigint;
+    floatAmountUsdcUnits: bigint;
+    allowedActions: bigint;
     epochSpentUsdcUnits: bigint;
   }> {
-    const [owner, agentKey, agentExpiry, usdcToken, paused, perTxCap, dailyCap, epochSpent] = await Promise.all([
+    const [owner, agentKey, agentExpiry, usdcToken, paused, perTxCap, dailyCap, floatAmount, allowedActions, epochSpent] = await Promise.all([
       this.publicClient.readContract({ address: vaultAddress, abi: PERIBOLOS_VAULT_ABI, functionName: 'owner' }),
       this.publicClient.readContract({ address: vaultAddress, abi: PERIBOLOS_VAULT_ABI, functionName: 'agentKey' }),
       this.publicClient.readContract({ address: vaultAddress, abi: PERIBOLOS_VAULT_ABI, functionName: 'agentExpiry' }),
@@ -248,6 +377,8 @@ export class ManagedSignerService {
       this.publicClient.readContract({ address: vaultAddress, abi: PERIBOLOS_VAULT_ABI, functionName: 'paused' }),
       this.publicClient.readContract({ address: vaultAddress, abi: PERIBOLOS_VAULT_ABI, functionName: 'perTxCap' }),
       this.publicClient.readContract({ address: vaultAddress, abi: PERIBOLOS_VAULT_ABI, functionName: 'dailyCap' }),
+      this.publicClient.readContract({ address: vaultAddress, abi: PERIBOLOS_VAULT_ABI, functionName: 'floatAmount' }),
+      this.publicClient.readContract({ address: vaultAddress, abi: PERIBOLOS_VAULT_ABI, functionName: 'allowedActions' }),
       this.publicClient.readContract({ address: vaultAddress, abi: PERIBOLOS_VAULT_ABI, functionName: 'epochSpent' })
     ]);
     const balanceUsdcUnits = await this.publicClient.readContract({
@@ -266,6 +397,8 @@ export class ManagedSignerService {
       paused,
       perTxCapUsdcUnits: perTxCap,
       dailyCapUsdcUnits: dailyCap,
+      floatAmountUsdcUnits: floatAmount,
+      allowedActions,
       epochSpentUsdcUnits: epochSpent
     };
   }
@@ -465,7 +598,7 @@ export class ManagedSignerService {
 
       return this.classifyVaultReceipt(hash, params.vaultAddress, receipt.logs);
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : String(err);
+      const message = safeChainError(err, 'The on-chain payment could not be completed.');
       console.log('[Signer] On-chain execution failed (honest FAILED):', message.slice(0, 200));
       return {
         status: 'FAILED',

@@ -56,16 +56,24 @@ export default function DashboardOverviewPage() {
         const agents = agentsResult.status === 'fulfilled' ? agentsResult.value : [];
         const payees = payeesResult.status === 'fulfilled' ? payeesResult.value : [];
         const vaults = vaultsResult.status === 'fulfilled' ? vaultsResult.value : [];
+        const liveVaults = Array.isArray(vaults) ? vaults.filter((vault: any) => vault.mode === 'live') : [];
+        const protectedAgentIds = new Set(liveVaults.map((vault: any) => vault.agentId));
 
         const prs = activity?.paymentRequests || [];
         setPaymentRequests(prs);
         const blocked = prs.filter((pr: any) => pr.status === 'BLOCKED').length;
+        const todayUtc = new Date().toISOString().slice(0, 10);
+        const executedToday = prs.filter((pr: any) => {
+          if (pr.status !== 'EXECUTED' || typeof pr.createdAt !== 'string') return false;
+          const created = new Date(pr.createdAt);
+          return !Number.isNaN(created.getTime()) && created.toISOString().slice(0, 10) === todayUtc;
+        });
 
         const hasAgent = Array.isArray(agents) && agents.length > 0;
         const hasVault = Array.isArray(vaults) && vaults.some((vault: any) => vault.mode === 'live');
         const hasPayee = Array.isArray(payees) && payees.length > 0;
         const hasBrowserApiKey = typeof window !== 'undefined' && Boolean(window.localStorage.getItem('peribolos.apiKey.v1'));
-        const hasApiKey = hasBrowserApiKey || Boolean(process.env.NEXT_PUBLIC_PERIBOLOS_API_KEY);
+        const hasApiKey = hasBrowserApiKey;
         const hasExecutedPayment = prs.some((pr: any) => pr.status === 'EXECUTED');
         const hasActivity = prs.length > 0;
 
@@ -79,14 +87,13 @@ export default function DashboardOverviewPage() {
         });
 
         setStats({
-          agentsCount: hasAgent ? agents.length : 0,
-          vaultsCount: hasVault ? vaults.length : 0,
+          agentsCount: protectedAgentIds.size,
+          vaultsCount: liveVaults.length,
           payeesCount: hasPayee ? payees.length : 0,
-          todaySpentUsdc: prs
-            .filter((pr: any) => pr.status === 'EXECUTED')
+          todaySpentUsdc: executedToday
             .reduce((acc: number, cur: any) => acc + (cur.amountUsdc || 0), 0),
-          dailyCapUsdc: Array.isArray(vaults)
-            ? vaults.reduce((acc: number, vault: any) => acc + Number(vault.dailyCapUsdc || 0), 0)
+          dailyCapUsdc: liveVaults.length > 0
+            ? liveVaults.reduce((acc: number, vault: any) => acc + Number(vault.dailyCapUsdc || 0), 0)
             : 0,
           blockedAttemptsCount: blocked,
         });
@@ -177,7 +184,7 @@ export default function DashboardOverviewPage() {
                 <div className="mt-4 h-1.5 w-full overflow-hidden rounded-full bg-line" aria-label={`${Math.round(budgetUsage)}% of daily budget used`}>
                   <div className="h-full rounded-full bg-accent transition-all duration-500" style={{ width: `${budgetUsage}%` }} />
                 </div>
-                <p className="mt-2 text-xs text-text-muted">{Math.round(budgetUsage)}% of the configured limit used.</p>
+                <p className="mt-2 text-xs text-text-muted">{Math.round(budgetUsage)}% of the configured limit used this UTC day.</p>
               </>
             ) : (
               <p className="mt-2 text-xs text-text-muted">Create a vault to start tracking a daily spending limit.</p>
@@ -246,7 +253,7 @@ export default function DashboardOverviewPage() {
           <p className="mt-1 text-xs leading-5 text-text-muted">The controls active across this workspace.</p>
         </div>
         <dl className="mt-6 divide-y divide-line border-y border-line">
-          <div className="flex items-center justify-between py-4"><dt className="text-sm text-text-muted">Agent vaults</dt><dd className="font-mono text-sm font-semibold text-text">{stats.vaultsCount}</dd></div>
+          <div className="flex items-center justify-between py-4"><dt className="text-sm text-text-muted">Live vaults</dt><dd className="font-mono text-sm font-semibold text-text">{stats.vaultsCount}</dd></div>
           <div className="flex items-center justify-between py-4"><dt className="text-sm text-text-muted">Recipient rules</dt><dd className="font-mono text-sm font-semibold text-text">{stats.payeesCount}</dd></div>
           <div className="flex items-center justify-between py-4"><dt className="text-sm text-text-muted">Blocked decisions</dt><dd className={`font-mono text-sm font-semibold ${stats.blockedAttemptsCount ? "text-blocked" : "text-accent"}`}>{stats.blockedAttemptsCount}</dd></div>
         </dl>
